@@ -1,6 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
+
+// Import our core modules
+const { fetchRepoTree, fetchFileContent } = require('./githubService');
+const { prioritizeFiles } = require('./prioritizer');
+const { runLinter } = require('./linter');
+const { detectSecrets } = require('./detectors/secrets');
+const { detectVibeIssues } = require('./detectors/vibe');
+const { auditDependencies } = require('./audit');
+const { analyzeWithLLM } = require('./llmService');
+const { computeFinalScores } = require('./scorer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,7 +26,6 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Endpoint to start analysis
 app.post('/analyze', (req, res) => {
     const { repoUrl } = req.body;
     
@@ -23,29 +33,24 @@ app.post('/analyze', (req, res) => {
         return res.status(400).json({ error: 'repoUrl is required' });
     }
 
-    // Generate a unique job ID
-    const jobId = require('crypto').randomUUID();
+    const jobId = crypto.randomUUID();
     
-    // Initialize job state
     jobs.set(jobId, {
         id: jobId,
         repoUrl,
-        status: 'queued', // queued -> fetching -> analyzing -> done -> error
+        status: 'queued', 
         result: null,
         error: null,
         createdAt: new Date().toISOString()
     });
 
-    // Fire and forget the background process (for now, we'll just mock a delay)
     processJob(jobId, repoUrl).catch(err => {
         console.error(`Job ${jobId} failed:`, err);
     });
 
-    // Return the job ID immediately
     res.status(202).json({ jobId, status: 'queued' });
 });
 
-// Endpoint to poll for job status
 app.get('/result/:jobId', (req, res) => {
     const { jobId } = req.params;
     
@@ -57,43 +62,57 @@ app.get('/result/:jobId', (req, res) => {
     res.json(job);
 });
 
-// Mock processing function (will be replaced with actual pipeline later)
+// The actual analysis pipeline
 async function processJob(jobId, repoUrl) {
     const job = jobs.get(jobId);
     
     try {
+        // Parse owner and repo from URL
+        let cleanUrl = repoUrl.replace(/\.git$/, '');
+        if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
+        const parts = cleanUrl.split('/');
+        const repo = parts.pop();
+        const owner = parts.pop();
+
+        if (!owner || !repo) {
+            throw new Error("Invalid GitHub URL format");
+        }
+
         job.status = 'fetching';
-        // Mock delay for fetching
-        await new Promise(resolve => setTimeout(resolve, 2000));
         
+        // 1. Fetch File Tree
+        const allFiles = await fetchRepoTree(owner, repo);
+        
+        // 2. Prioritize and fetch contents (max 80k tokens)
+        const { selectedFiles } = await prioritizeFiles(allFiles, 80000, async (path) => {
+            return await fetchFileContent(owner, repo, path);
+        });
+
         job.status = 'analyzing';
-        // Mock delay for analyzing
-        await new Promise(resolve => setTimeout(resolve, 3000));
         
+        // 3. Static Analysis Layer (Run in parallel)
+        const [linterIssues, secretIssues, vibeIssues, depIssues] = await Promise.all([
+            runLinter(selectedFiles),
+            detectSecrets(selectedFiles),
+            detectVibeIssues(selectedFiles),
+            auditDependencies(selectedFiles)
+        ]);
+
+        const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
+
+        // 4. LLM Analysis Layer
+        const llmReport = await analyzeWithLLM(selectedFiles, staticIssues);
+
+        // 5. Score Merger
+        const finalReport = computeFinalScores(llmReport, staticIssues);
+
         job.status = 'done';
-        job.result = {
-            overallScore: 85,
-            categories: {
-                security: 80,
-                scalability: 90,
-                quality: 85,
-                production: 75,
-                maintainability: 95
-            },
-            issues: [
-                {
-                    category: 'Security',
-                    severity: 'Warning',
-                    file: 'config/db.js',
-                    line: 12,
-                    description: 'No password set for database connection in development',
-                    fix: 'Use environment variables for database credentials even in development'
-                }
-            ]
-        };
+        job.result = finalReport;
+
     } catch (error) {
         job.status = 'error';
         job.error = error.message;
+        console.error(`Error processing job ${jobId}:`, error);
     }
 }
 
