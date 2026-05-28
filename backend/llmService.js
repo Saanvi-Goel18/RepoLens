@@ -1,8 +1,18 @@
 const OpenAI = require("openai");
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+let openaiInstance = null;
+
+function getOpenAIClient() {
+    if (!openaiInstance) {
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error("OPENAI_API_KEY environment variable is missing. Please add it to your .env file.");
+        }
+        openaiInstance = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+    }
+    return openaiInstance;
+}
 
 const rubricSchema = {
     type: "object",
@@ -47,6 +57,8 @@ const rubricSchema = {
 };
 
 async function analyzeWithLLM(files, staticIssues) {
+    const openai = getOpenAIClient();
+
     // 1. Prepare the context
     const fileContext = files.map(f => {
         return `\n--- FILE: ${f.path} ---\n${f.content}\n--- END FILE ---`;
