@@ -211,24 +211,6 @@ The final score is a weighted average of 5 categories:
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] Deploy to Vercel (frontend) + Render (backend)
-- [ ] Add unit tests for `scorer.js`, `prioritizer.js`, and detectors
-- [ ] Support private repositories via OAuth
-- [ ] Redis-backed job persistence (survive server restarts)
-- [ ] Rate limiting on `/analyze` endpoint
-- [ ] Support Python repos (pip + bandit integration)
-- [ ] Shareable report URLs
-
----
-
-## 🤝 Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
-
----
-
 ## 📄 License
 
 MIT © [Saanvi Goel](https://github.com/Saanvi-Goel18)
