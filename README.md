@@ -1,64 +1,234 @@
-# 🔍 RepoLens
+<div align="center">
 
-**Instant Health Report for your GitHub Repo**
+<img src="https://img.shields.io/badge/RepoLens-AI%20Code%20Reviewer-6366f1?style=for-the-badge&logo=github&logoColor=white" alt="RepoLens" />
 
-RepoLens is an AI-powered code reviewer designed to give you an immediate, structured health report for any public GitHub repository. No setup, no CI/CD integration, and no pull requests required. Paste a URL and get a score across 5 key metrics: Security, Scalability, Code Quality, Production Readiness, and Maintainability.
+<h1>🔍 RepoLens</h1>
 
-## 🚀 Why RepoLens?
-The problem with "vibe-coded" applications isn't that they don't work—it's that they work until they don't. They ship with hardcoded secrets, no rate limiting, and missing error handlers. 
+<p><strong>An AI-powered code health analyzer that reviews any public GitHub repository in seconds.</strong><br/>
+Combines deterministic static analysis with contextual LLM review to produce a structured, weighted health report.</p>
 
-Existing tools like CodeRabbit live inside PRs and require team setups. Conversational AI lacks a structured, repeatable rubric. RepoLens combines **Deterministic Static Analysis** with **Contextual LLM Analysis** to give you the best of both worlds in seconds.
+<p>
+  <img src="https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=flat-square&logo=openai&logoColor=white" />
+  <img src="https://img.shields.io/badge/GitHub-Octokit-181717?style=flat-square&logo=github&logoColor=white" />
+  <img src="https://img.shields.io/badge/OSV-Vulnerability%20DB-red?style=flat-square" />
+</p>
+
+<p>
+  <a href="#-demo">View Demo</a> ·
+  <a href="#-how-it-works">How It Works</a> ·
+  <a href="#-getting-started">Getting Started</a> ·
+  <a href="#-architecture">Architecture</a>
+</p>
+
+</div>
+
+---
+
+## 🎯 The Problem
+
+Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no rate limiting, vulnerable dependencies, and broken async patterns. Existing tools like CodeRabbit live inside pull requests and require team setup. ChatGPT gives generic advice without a repeatable rubric.
+
+**RepoLens gives you a structured, scored health report for any GitHub repository in under 30 seconds — no login, no CI/CD, no installation.**
+
+---
 
 ## ✨ Features
-- **URL Input**: Paste any GitHub repository URL.
-- **File Prioritizer**: Automatically detects and scores high-value files (entry points, auth logic, DB models) to stay within LLM context windows.
-- **Hybrid Analysis Engine**:
-  - *Static Layer*: Programmatic ESLint, Regex secrets detection, custom vibe-code detectors (missing rate limits, poor error handling), and OSV Dependency Audits.
-  - *LLM Layer*: Analyzes architectural patterns and logical flaws using strict JSON schema prompting.
-- **Score Merger**: Deterministic static flags (like a leaked API key) override and penalize LLM baseline scores to ensure security rules are strictly enforced.
-- **Beautiful Dashboard**: Glassmorphism UI with expandable issue lists categorized by severity.
+
+- **Zero Setup** — Paste a GitHub URL. That's it.
+- **Async Job Queue** — Submits analysis as a background job (`202 Accepted`), polls for results. Handles large repos without timeouts.
+- **Hybrid Analysis Engine** — 4 static detectors + 1 LLM layer running concurrently.
+- **Weighted Score System** — Overall health score (0-100) computed across 5 rubric categories.
+- **Expandable Issue Reports** — Every issue comes with a file path, line number, severity, and a concrete fix suggestion.
+- **Production-safe Boot** — Backend starts cleanly even without API keys configured; errors surface at the job level, not the server level.
+
+---
+
+## 🧠 How It Works
+
+A single analysis request triggers a **5-stage pipeline**:
+
+```
+GitHub URL
+    │
+    ▼
+[1] File Tree Fetch (Octokit)
+    │  Fetches the full file tree of the repository via GitHub API.
+    │
+    ▼
+[2] Intelligent File Prioritizer (tiktoken)
+    │  Scores files by type (auth > models > routes > config).
+    │  Fetches content in priority order, enforcing an 80,000-token budget.
+    │
+    ▼
+[3] Static Analysis Layer  (runs in parallel via Promise.all)
+    │  ├─ ESLint Linter       — Programmatic AST-based code quality checks
+    │  ├─ Secrets Detector    — Regex scan for API keys, JWTs, hardcoded credentials
+    │  ├─ Vibe-code Detector  — Flags missing rate limits, poor async patterns, mixed module systems
+    │  └─ OSV Dependency Audit — Batch queries the OSV vulnerability DB for all npm dependencies
+    │
+    ▼
+[4] LLM Analysis (GPT-4o-mini + Structured JSON Schema)
+    │  Receives file contents + static issues as context.
+    │  Returns category scores and additional architectural issues
+    │  via strict JSON schema enforcement (no hallucinated formats).
+    │
+    ▼
+[5] Score Merger
+    │  Uses LLM scores as the baseline.
+    │  Applies deterministic penalties for static issues:
+    │    Critical security issue  → -30 from security score
+    │    Critical other issue     → -20 from category score
+    │  Computes final weighted overall score:
+    │    Security (30%) + Scalability (20%) + Quality (20%) + Production (20%) + Maintainability (10%)
+    │
+    ▼
+ Final Health Report (JSON → Dashboard UI)
+```
+
+---
 
 ## 🛠️ Tech Stack
-- **Frontend**: React, Vite, React Router, Lucide Icons
-- **Backend**: Node.js, Express, Octokit (GitHub API)
-- **AI/Analysis**: OpenAI (GPT-4o-mini), ESLint programmatic API, OSV vulnerability API
 
-## 🚦 Getting Started
+| Layer | Technology | Why |
+|---|---|---|
+| Backend Runtime | Node.js + Express | Non-blocking I/O for concurrent API calls |
+| GitHub Integration | Octokit (REST) | Official GitHub SDK, handles auth & rate limits |
+| Token Management | tiktoken | Exact token counting (not estimation) for GPT context budget |
+| LLM | OpenAI GPT-4o-mini | Best speed/cost ratio for structured output; `json_schema` response format enforces deterministic output |
+| Vulnerability Data | OSV API (batch) | Free, open, authoritative vulnerability database — no API key needed |
+| Frontend | React + Vite | Fast HMR during development, optimized production builds |
+| Routing | React Router v6 | Client-side routing for `/` and `/r/:jobId` report pages |
+| Icons | Lucide React | Consistent, lightweight icon system |
+
+---
+
+## 📁 Project Structure
+
+```
+repolens/
+├── backend/
+│   ├── index.js              # Express server, job queue, analysis pipeline orchestrator
+│   ├── githubService.js      # Octokit wrapper: fetchRepoTree, fetchFileContent
+│   ├── prioritizer.js        # File scoring + token-budget-aware content fetcher
+│   ├── linter.js             # Programmatic ESLint runner
+│   ├── scorer.js             # Score merger: static penalties + weighted overall score
+│   ├── llmService.js         # OpenAI integration with strict JSON schema prompting
+│   ├── audit.js              # OSV vulnerability DB batch query
+│   └── detectors/
+│       ├── secrets.js        # Hardcoded credentials regex detector
+│       └── vibe.js           # Missing rate limits, bad async, mixed module systems
+└── frontend/
+    └── src/
+        ├── App.jsx           # Router setup
+        └── pages/
+            ├── Home.jsx      # URL input, hero section
+            └── Dashboard.jsx # Score cards, issue list, polling
+```
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js v18+
-- GitHub Personal Access Token (for API rate limits)
-- OpenAI API Key
+- A GitHub Personal Access Token ([generate here](https://github.com/settings/tokens)) — needed for higher API rate limits
+- An OpenAI API Key ([get one here](https://platform.openai.com/api-keys))
 
-### Installation
+### 1. Clone the repository
+```bash
+git clone https://github.com/Saanvi-Goel18/RepoLens.git
+cd RepoLens
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Saanvi-Goel18/RepoLens.git
-   cd RepoLens
-   ```
+### 2. Configure the backend
+```bash
+cd backend
+npm install
+```
 
-2. **Setup Backend**
-   ```bash
-   cd backend
-   npm install
-   cp .env.example .env
-   # Add your GITHUB_TOKEN and OPENAI_API_KEY to the .env file
-   npm run dev
-   ```
+Create a `.env` file:
+```env
+GITHUB_TOKEN=ghp_your_token_here
+OPENAI_API_KEY=sk-your_key_here
+PORT=3001
+```
 
-3. **Setup Frontend**
-   ```bash
-   cd ../frontend
-   npm install
-   npm run dev
-   ```
+Start the backend:
+```bash
+npm run dev
+```
 
-4. **Run**
-   Navigate to `http://localhost:5173` in your browser.
+### 3. Start the frontend
+```bash
+cd ../frontend
+npm install
+npm run dev
+```
 
-## 📸 Demo
-*(Add your demo GIF here)*
+### 4. Open the app
+Navigate to **http://localhost:5173**, paste any public GitHub repo URL, and click **Analyze**.
+
+---
+
+## 🔌 API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Server health check |
+| `POST` | `/analyze` | Submit a repo URL for analysis. Returns `{ jobId }` immediately (`202 Accepted`). |
+| `GET` | `/result/:jobId` | Poll for job status. Returns `queued`, `fetching`, `analyzing`, `done`, or `error`. |
+
+**Example:**
+```bash
+# Submit
+curl -X POST http://localhost:3001/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repoUrl": "https://github.com/expressjs/express"}'
+
+# {"jobId":"abc-123","status":"queued"}
+
+# Poll
+curl http://localhost:3001/result/abc-123
+```
+
+---
+
+## 📊 Scoring Rubric
+
+The final score is a weighted average of 5 categories:
+
+| Category | Weight | What's Evaluated |
+|---|---|---|
+| 🔐 Security | 30% | Hardcoded secrets, missing auth middleware, CORS config, vulnerable deps |
+| ⚡ Scalability | 20% | N+1 queries, synchronous blocking ops, pagination, caching |
+| ✨ Code Quality | 20% | ESLint issues, module consistency, error handling, complexity |
+| 🚢 Production Readiness | 20% | Env var usage, structured logging, health checks, Docker/PM2 config |
+| 🧹 Maintainability | 10% | Folder structure, README quality, test coverage |
+
+**Static issues override LLM scores:** A hardcoded API key detected by the secrets scanner immediately applies a -30 penalty to the security score, regardless of what the LLM says.
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Deploy to Vercel (frontend) + Render (backend)
+- [ ] Add unit tests for `scorer.js`, `prioritizer.js`, and detectors
+- [ ] Support private repositories via OAuth
+- [ ] Redis-backed job persistence (survive server restarts)
+- [ ] Rate limiting on `/analyze` endpoint
+- [ ] Support Python repos (pip + bandit integration)
+- [ ] Shareable report URLs
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
+
+---
 
 ## 📄 License
-MIT
+
+MIT © [Saanvi Goel](https://github.com/Saanvi-Goel18)
