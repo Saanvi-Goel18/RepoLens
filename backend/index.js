@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 
 // Import our core modules
 const { fetchRepoTree, fetchFileContent } = require('./githubService');
@@ -16,35 +17,87 @@ const { computeFinalScores } = require('./scorer');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ─── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// In-memory queue/store for jobs
-const jobs = new Map();
-
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+// Rate limiter: max 5 analysis requests per IP per 15 minutes
+const analyzeLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many analysis requests. Please wait 15 minutes before trying again.' }
 });
 
-app.post('/analyze', (req, res) => {
+// ─── Job Store ────────────────────────────────────────────────────────────────
+const jobs = new Map();
+const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
+
+// Clean up expired jobs every 30 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, job] of jobs.entries()) {
+        if (now - new Date(job.createdAt).getTime() > JOB_TTL_MS) {
+            jobs.delete(id);
+        }
+    }
+}, 30 * 60 * 1000);
+
+// ─── Input Validation ─────────────────────────────────────────────────────────
+function parseGitHubUrl(rawUrl) {
+    // Accept: https://github.com/owner/repo or github.com/owner/repo
+    let url = rawUrl.trim().replace(/\.git$/, '').replace(/\/$/, '');
+    if (!url.startsWith('http')) url = `https://${url}`;
+
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return null;
+    }
+
+    if (parsed.hostname !== 'github.com') return null;
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+
+    return { owner: parts[0], repo: parts[1] };
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', jobs: jobs.size });
+});
+
+app.post('/analyze', analyzeLimiter, (req, res) => {
     const { repoUrl } = req.body;
-    
+
     if (!repoUrl) {
         return res.status(400).json({ error: 'repoUrl is required' });
     }
 
+    const parsed = parseGitHubUrl(repoUrl);
+    if (!parsed) {
+        return res.status(400).json({
+            error: 'Invalid URL. Please provide a valid public GitHub repository URL (e.g. https://github.com/owner/repo).'
+        });
+    }
+
     const jobId = crypto.randomUUID();
-    
+
     jobs.set(jobId, {
         id: jobId,
-        repoUrl,
-        status: 'queued', 
+        repoUrl: repoUrl.trim(),
+        owner: parsed.owner,
+        repo: parsed.repo,
+        status: 'queued',
         result: null,
         error: null,
         createdAt: new Date().toISOString()
     });
 
-    processJob(jobId, repoUrl).catch(err => {
+    processJob(jobId, parsed.owner, parsed.repo).catch(err => {
         console.error(`Job ${jobId} failed:`, err);
     });
 
@@ -53,43 +106,34 @@ app.post('/analyze', (req, res) => {
 
 app.get('/result/:jobId', (req, res) => {
     const { jobId } = req.params;
-    
     const job = jobs.get(jobId);
+
     if (!job) {
-        return res.status(404).json({ error: 'Job not found' });
+        return res.status(404).json({ error: 'Report not found. It may have expired (1 hour TTL) or never existed.' });
     }
 
     res.json(job);
 });
 
-// The actual analysis pipeline
-async function processJob(jobId, repoUrl) {
+// ─── Analysis Pipeline ────────────────────────────────────────────────────────
+async function processJob(jobId, owner, repo) {
     const job = jobs.get(jobId);
-    
+
     try {
-        // Parse owner and repo from URL
-        let cleanUrl = repoUrl.replace(/\.git$/, '');
-        if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-        const parts = cleanUrl.split('/');
-        const repo = parts.pop();
-        const owner = parts.pop();
-
-        if (!owner || !repo) {
-            throw new Error("Invalid GitHub URL format");
-        }
-
         job.status = 'fetching';
-        
+
         // 1. Fetch File Tree
         const allFiles = await fetchRepoTree(owner, repo);
-        
+
         // 2. Prioritize and fetch contents (max 80k tokens)
-        const { selectedFiles } = await prioritizeFiles(allFiles, 80000, async (path) => {
+        const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 80000, async (path) => {
             return await fetchFileContent(owner, repo, path);
         });
 
+        console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
+
         job.status = 'analyzing';
-        
+
         // 3. Static Analysis Layer (Run in parallel)
         const [linterIssues, secretIssues, vibeIssues, depIssues] = await Promise.all([
             runLinter(selectedFiles),
@@ -99,6 +143,7 @@ async function processJob(jobId, repoUrl) {
         ]);
 
         const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
+        console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
 
         // 4. LLM Analysis Layer
         const llmReport = await analyzeWithLLM(selectedFiles, staticIssues);
@@ -108,11 +153,14 @@ async function processJob(jobId, repoUrl) {
 
         job.status = 'done';
         job.result = finalReport;
+        job.completedAt = new Date().toISOString();
+
+        console.log(`[${jobId}] Done. Overall score: ${finalReport.overallScore}`);
 
     } catch (error) {
         job.status = 'error';
         job.error = error.message;
-        console.error(`Error processing job ${jobId}:`, error);
+        console.error(`[${jobId}] Error:`, error.message);
     }
 }
 

@@ -106,14 +106,41 @@
 }
 
 .error-message {
-    color: var(--danger);
-    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
     padding: 12px 20px;
     border-radius: 8px;
-    margin-top: 24px;
+    margin-top: 16px;
     font-size: 14px;
     font-weight: 500;
 }
+
+.search-form.has-error {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.example-link-hint {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.example-btn {
+    background: none;
+    border: none;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    transition: opacity 0.2s;
+}
+
+.example-btn:hover { opacity: 0.75; }
 
 .features-grid {
     display: grid;
