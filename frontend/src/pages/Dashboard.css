@@ -239,6 +239,83 @@
     font-weight: 500;
 }
 
+/* Issues Toolbar */
+.issues-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.issues-toolbar .section-title {
+    margin-bottom: 0;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-icon {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.filter-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border-color);
+    margin: 0 2px;
+}
+
+.filter-chip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    opacity: 0.35;
+    background: transparent;
+    letter-spacing: 0.03em;
+}
+
+.filter-chip.active { opacity: 1; }
+
+/* Severity chips */
+.filter-chip-critical               { color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+.filter-chip-critical.active        { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.5); }
+.filter-chip-warning                { color: #fcd34d; border-color: rgba(245,158,11,0.3); }
+.filter-chip-warning.active         { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.5); }
+.filter-chip-info                   { color: #93c5fd; border-color: rgba(59,130,246,0.3); }
+.filter-chip-info.active            { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.5); }
+
+/* Category chips */
+.filter-chip-cat                    { color: var(--text-secondary); border-color: var(--border-color); }
+.filter-chip-cat.active             { color: var(--accent-primary); background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.4); }
+
+.filter-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+    margin-left: 4px;
+}
+
+.filter-clear:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
 /* Issues List */
 .section-title {
     font-size: 20px;

@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShieldAlert, AlertTriangle, Info, ChevronDown, ChevronRight, Activity, ArrowLeft, Copy, Check, ExternalLink } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Info, ChevronDown, ChevronRight, Activity, ArrowLeft, Copy, Check, ExternalLink, SlidersHorizontal, X } from 'lucide-react';
 import './Dashboard.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+const SEVERITY_ORDER = { Critical: 0, Warning: 1, Info: 2 };
+
+const ALL_CATEGORIES = ['Security', 'Scalability', 'Code Quality', 'Production Readiness', 'Maintainability'];
+const ALL_SEVERITIES = ['Critical', 'Warning', 'Info'];
 
 export default function Dashboard() {
     const { jobId } = useParams();
@@ -12,9 +17,12 @@ export default function Dashboard() {
     const [expandedIssues, setExpandedIssues] = useState(new Set());
     const [copied, setCopied] = useState(false);
 
+    // ── Filter state ────────────────────────────────────────────────────────
+    const [activeSeverities, setActiveSeverities] = useState(new Set(ALL_SEVERITIES));
+    const [activeCategories, setActiveCategories] = useState(new Set(ALL_CATEGORIES));
+
     useEffect(() => {
         let intervalId;
-
         const pollStatus = async () => {
             try {
                 const res = await fetch(`${BACKEND}/result/${jobId}`);
@@ -29,7 +37,6 @@ export default function Dashboard() {
                 clearInterval(intervalId);
             }
         };
-
         pollStatus();
         intervalId = setInterval(pollStatus, 3000);
         return () => clearInterval(intervalId);
@@ -47,7 +54,26 @@ export default function Dashboard() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // ─── Error state ───────────────────────────────────────────────────────────
+    const toggleSeverity = (sev) => {
+        const next = new Set(activeSeverities);
+        next.has(sev) ? next.delete(sev) : next.add(sev);
+        setActiveSeverities(next);
+        setExpandedIssues(new Set()); // collapse all on filter change
+    };
+
+    const toggleCategory = (cat) => {
+        const next = new Set(activeCategories);
+        next.has(cat) ? next.delete(cat) : next.add(cat);
+        setActiveCategories(next);
+        setExpandedIssues(new Set());
+    };
+
+    const clearFilters = () => {
+        setActiveSeverities(new Set(ALL_SEVERITIES));
+        setActiveCategories(new Set(ALL_CATEGORIES));
+    };
+
+    // ── Loading / Error states ──────────────────────────────────────────────
     if (error) {
         return (
             <div className="dashboard-container centered">
@@ -61,15 +87,13 @@ export default function Dashboard() {
         );
     }
 
-    // ─── Loading state ─────────────────────────────────────────────────────────
     if (!job || (job.status !== 'done' && job.status !== 'error')) {
         const statusMessages = {
-            queued: { text: 'Queued for analysis...', sub: 'Starting up the pipeline.' },
-            fetching: { text: 'Fetching repository...', sub: 'Pulling file tree and source files from GitHub.' },
+            queued:    { text: 'Queued for analysis...', sub: 'Starting up the pipeline.' },
+            fetching:  { text: 'Fetching repository...', sub: 'Pulling file tree and source files from GitHub.' },
             analyzing: { text: 'Running analysis engines...', sub: 'Static detectors and LLM are working in parallel.' },
         };
         const msg = statusMessages[job?.status] || { text: 'Preparing...', sub: 'Hang tight.' };
-
         return (
             <div className="dashboard-container centered">
                 <div className="state-card glass-panel">
@@ -82,7 +106,6 @@ export default function Dashboard() {
         );
     }
 
-    // ─── Job-level error ───────────────────────────────────────────────────────
     if (job.status === 'error') {
         return (
             <div className="dashboard-container centered">
@@ -102,15 +125,31 @@ export default function Dashboard() {
     const getScoreLabel = (s) => s >= 85 ? 'Excellent' : s >= 75 ? 'Good' : s >= 50 ? 'Needs Attention' : 'Critical Issues';
 
     const categoryMeta = {
-        security: { label: 'Security', emoji: '🔐' },
-        scalability: { label: 'Scalability', emoji: '⚡' },
-        quality: { label: 'Code Quality', emoji: '✨' },
-        production: { label: 'Production', emoji: '🚢' },
+        security:        { label: 'Security',        emoji: '🔐' },
+        scalability:     { label: 'Scalability',     emoji: '⚡' },
+        quality:         { label: 'Code Quality',    emoji: '✨' },
+        production:      { label: 'Production',      emoji: '🚢' },
         maintainability: { label: 'Maintainability', emoji: '🧹' },
     };
 
     const severityCounts = { Critical: 0, Warning: 0, Info: 0 };
     issues.forEach(i => { if (severityCounts[i.severity] !== undefined) severityCounts[i.severity]++; });
+
+    // ── Filtered issues (memoized) ──────────────────────────────────────────
+    const filteredIssues = useMemo(() => {
+        return issues.filter(issue =>
+            activeSeverities.has(issue.severity) &&
+            ALL_CATEGORIES.some(cat => issue.category.includes(cat.split(' ')[0]) && activeCategories.has(cat))
+        );
+    }, [issues, activeSeverities, activeCategories]);
+
+    const isFiltered = activeSeverities.size < ALL_SEVERITIES.length || activeCategories.size < ALL_CATEGORIES.length;
+
+    const iconMap = {
+        Critical: <ShieldAlert size={16} className="text-danger" />,
+        Warning:  <AlertTriangle size={16} className="text-warn" />,
+        Info:     <Info size={16} className="text-info" />,
+    };
 
     return (
         <div className="dashboard-container animate-fade-in">
@@ -119,12 +158,7 @@ export default function Dashboard() {
             <div className="dashboard-header">
                 <div>
                     <div className="repo-breadcrumb">
-                        <a
-                            href={job.repoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="repo-link"
-                        >
+                        <a href={job.repoUrl} target="_blank" rel="noopener noreferrer" className="repo-link">
                             {job.repoUrl.replace('https://github.com/', '')}
                             <ExternalLink size={14} />
                         </a>
@@ -153,8 +187,8 @@ export default function Dashboard() {
                     </div>
                     <div className="severity-pills">
                         {severityCounts.Critical > 0 && <span className="pill pill-critical">{severityCounts.Critical} Critical</span>}
-                        {severityCounts.Warning > 0 && <span className="pill pill-warning">{severityCounts.Warning} Warning</span>}
-                        {severityCounts.Info > 0 && <span className="pill pill-info">{severityCounts.Info} Info</span>}
+                        {severityCounts.Warning > 0  && <span className="pill pill-warning">{severityCounts.Warning} Warning</span>}
+                        {severityCounts.Info > 0     && <span className="pill pill-info">{severityCounts.Info} Info</span>}
                     </div>
                 </div>
 
@@ -168,10 +202,7 @@ export default function Dashboard() {
                                     {meta.label}
                                 </div>
                                 <div className="score-bar-track">
-                                    <div
-                                        className="score-bar-fill"
-                                        style={{ width: `${score}%`, backgroundColor: getScoreColor(score) }}
-                                    />
+                                    <div className="score-bar-fill" style={{ width: `${score}%`, backgroundColor: getScoreColor(score) }} />
                                 </div>
                                 <div className="score-val" style={{ color: getScoreColor(score) }}>{score}</div>
                             </div>
@@ -180,12 +211,48 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* ── Issues List ── */}
+            {/* ── Issues Section ── */}
             <div className="issues-section">
-                <h2 className="section-title">
-                    Detected Issues
-                    <span className="issue-count">{issues.length}</span>
-                </h2>
+                <div className="issues-toolbar">
+                    <h2 className="section-title">
+                        Detected Issues
+                        <span className="issue-count">{filteredIssues.length}{isFiltered ? ` of ${issues.length}` : ''}</span>
+                    </h2>
+
+                    <div className="filter-group">
+                        <SlidersHorizontal size={14} className="filter-icon" />
+
+                        {/* Severity filters */}
+                        {ALL_SEVERITIES.map(sev => (
+                            <button
+                                key={sev}
+                                onClick={() => toggleSeverity(sev)}
+                                className={`filter-chip filter-chip-${sev.toLowerCase()}${activeSeverities.has(sev) ? ' active' : ''}`}
+                            >
+                                {sev}
+                            </button>
+                        ))}
+
+                        <div className="filter-divider" />
+
+                        {/* Category filters */}
+                        {ALL_CATEGORIES.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => toggleCategory(cat)}
+                                className={`filter-chip filter-chip-cat${activeCategories.has(cat) ? ' active' : ''}`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+
+                        {isFiltered && (
+                            <button onClick={clearFilters} className="filter-clear">
+                                <X size={12}/> Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
 
                 <div className="issues-list glass-panel">
                     {issues.length === 0 ? (
@@ -193,14 +260,14 @@ export default function Dashboard() {
                             <Check size={32} style={{ color: 'var(--must)', marginBottom: 12 }} />
                             <p>No issues detected. This repo looks solid.</p>
                         </div>
+                    ) : filteredIssues.length === 0 ? (
+                        <div className="no-issues">
+                            <p>No issues match your current filters.</p>
+                            <button onClick={clearFilters} className="btn-secondary" style={{ marginTop: 12 }}>Clear Filters</button>
+                        </div>
                     ) : (
-                        issues.map((issue, idx) => {
+                        filteredIssues.map((issue, idx) => {
                             const isExpanded = expandedIssues.has(idx);
-                            const iconMap = {
-                                Critical: <ShieldAlert size={16} className="text-danger" />,
-                                Warning: <AlertTriangle size={16} className="text-warn" />,
-                                Info: <Info size={16} className="text-info" />,
-                            };
                             return (
                                 <div className={`issue-item${isExpanded ? ' expanded' : ''}`} key={idx}>
                                     <div className="issue-header" onClick={() => toggleIssue(idx)}>
