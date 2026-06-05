@@ -13,6 +13,7 @@ Combines deterministic static analysis with contextual LLM review to produce a s
   <img src="https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=flat-square&logo=openai&logoColor=white" />
   <img src="https://img.shields.io/badge/GitHub-Octokit-181717?style=flat-square&logo=github&logoColor=white" />
   <img src="https://img.shields.io/badge/OSV-Vulnerability%20DB-red?style=flat-square" />
+  <img src="https://github.com/Saanvi-Goel18/RepoLens/actions/workflows/ci.yml/badge.svg" alt="CI" />
 </p>
 
 <p>
