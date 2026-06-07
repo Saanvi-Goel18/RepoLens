@@ -39,10 +39,11 @@ function detectVibeIssues(files) {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             
-            if (line.includes('try {') || line.includes('try{')) {
+            if (line.match(/\btry\s*\{/)) {
                 inTryBlock = true;
             }
-            if (line.includes('catch (')) {
+            if (line.match(/\bcatch\s*\(/)) {
+                // Catches both `catch (err)` and `catch(err)` styles
                 inTryBlock = false;
             }
 
@@ -63,26 +64,23 @@ function detectVibeIssues(files) {
         }
     }
 
-    // Module system conflicts
-    let hasRequires = false;
-    let hasImports = false;
-
+    // Module system conflicts — check per file, not globally.
+    // Checking globally causes false positives on full-stack projects
+    // where frontend (ESM) and backend (CJS) coexist legitimately.
     for (const file of files) {
-        if (file.path.endsWith('.js') || file.path.endsWith('.ts')) {
-            if (file.content.match(/require\(['"]/)) hasRequires = true;
-            if (file.content.match(/^import .* from ['"]/m)) hasImports = true;
+        if (!file.path.endsWith('.js') && !file.path.endsWith('.ts')) continue;
+        const hasRequire = file.content.match(/require\(['"']/);
+        const hasImport  = file.content.match(/^import .* from ['"]/m);
+        if (hasRequire && hasImport) {
+            issues.push({
+                category: "Code Quality",
+                severity: "Warning",
+                file: file.path,
+                line: 1,
+                description: `Mixed module systems in ${file.path}: uses both require() (CommonJS) and import (ESM).`,
+                fix: "Standardize on either CommonJS (require) or ESM (import/export) within this file to avoid runtime errors."
+            });
         }
-    }
-
-    if (hasRequires && hasImports) {
-        issues.push({
-            category: "Code Quality",
-            severity: "Warning",
-            file: "Global",
-            line: 1,
-            description: "Mixed module systems detected: repository uses both `require()` (CommonJS) and `import` (ESM).",
-            fix: "Standardize on either CommonJS or ESM to avoid confusing runtime errors and build issues."
-        });
     }
 
     return issues;

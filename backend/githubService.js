@@ -24,6 +24,12 @@ async function fetchRepoTree(owner, repo) {
             recursive: 'true'
         });
 
+        // GitHub truncates the tree for repos with >100k files or >7MB payload.
+        // Log a warning so the job result can reflect partial coverage.
+        if (treeData.truncated) {
+            console.warn(`[${owner}/${repo}] GitHub tree response was truncated. Analysis covers a partial file list.`);
+        }
+
         // Filter for files only (blobs)
         const files = treeData.tree.filter(item => item.type === 'blob');
         return files.map(f => ({

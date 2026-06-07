@@ -17,7 +17,9 @@ async function auditDependencies(files) {
     }
 
     const queries = Object.entries(dependencies).map(([pkgName, version]) => {
-        const cleanVersion = version.replace(/[\^~><=]/g, '').trim();
+        // Strip range operators, then take only the first segment.
+        // Handles ">=1.2.3 <2.0.0" → "1.2.3" correctly.
+        const cleanVersion = version.replace(/[\^~><= ]/g, '').split(/\s+/)[0].trim();
         return {
             package: { name: pkgName, ecosystem: "npm" },
             version: cleanVersion

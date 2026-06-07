@@ -119,49 +119,61 @@ app.get('/result/:jobId', (req, res) => {
 async function processJob(jobId, owner, repo) {
     const job = jobs.get(jobId);
 
+    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
     try {
-        job.status = 'fetching';
-
-        // 1. Fetch File Tree
-        const allFiles = await fetchRepoTree(owner, repo);
-
-        // 2. Prioritize and fetch contents (max 80k tokens)
-        const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 80000, async (path) => {
-            return await fetchFileContent(owner, repo, path);
-        });
-
-        console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
-
-        job.status = 'analyzing';
-
-        // 3. Static Analysis Layer (Run in parallel)
-        const [linterIssues, secretIssues, vibeIssues, depIssues] = await Promise.all([
-            runLinter(selectedFiles),
-            detectSecrets(selectedFiles),
-            detectVibeIssues(selectedFiles),
-            auditDependencies(selectedFiles)
+        await Promise.race([
+            runPipeline(job, owner, repo),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Analysis timed out after 3 minutes. The repository may be too large.')), TIMEOUT_MS)
+            )
         ]);
-
-        const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
-        console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
-
-        // 4. LLM Analysis Layer
-        const llmReport = await analyzeWithLLM(selectedFiles, staticIssues);
-
-        // 5. Score Merger
-        const finalReport = computeFinalScores(llmReport, staticIssues);
-
-        job.status = 'done';
-        job.result = finalReport;
-        job.completedAt = new Date().toISOString();
-
-        console.log(`[${jobId}] Done. Overall score: ${finalReport.overallScore}`);
-
     } catch (error) {
         job.status = 'error';
         job.error = error.message;
         console.error(`[${jobId}] Error:`, error.message);
     }
+}
+
+async function runPipeline(job, owner, repo) {
+    const jobId = job.id;
+
+    job.status = 'fetching';
+
+    // 1. Fetch File Tree
+    const allFiles = await fetchRepoTree(owner, repo);
+
+    // 2. Prioritize and fetch contents (max 80k tokens)
+    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 80000, async (path) => {
+        return await fetchFileContent(owner, repo, path);
+    });
+
+    console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
+
+    job.status = 'analyzing';
+
+    // 3. Static Analysis Layer (Run in parallel)
+    const [linterIssues, secretIssues, vibeIssues, depIssues] = await Promise.all([
+        runLinter(selectedFiles),
+        detectSecrets(selectedFiles),
+        detectVibeIssues(selectedFiles),
+        auditDependencies(selectedFiles)
+    ]);
+
+    const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
+    console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
+
+    // 4. LLM Analysis Layer
+    const llmReport = await analyzeWithLLM(selectedFiles, staticIssues);
+
+    // 5. Score Merger
+    const finalReport = computeFinalScores(llmReport, staticIssues);
+
+    job.status = 'done';
+    job.result = finalReport;
+    job.completedAt = new Date().toISOString();
+
+    console.log(`[${jobId}] Done. Overall score: ${finalReport.overallScore}`);
 }
 
 app.listen(PORT, () => {

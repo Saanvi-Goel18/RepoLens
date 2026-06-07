@@ -5,8 +5,6 @@ import './Dashboard.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const SEVERITY_ORDER = { Critical: 0, Warning: 1, Info: 2 };
-
 const ALL_CATEGORIES = ['Security', 'Scalability', 'Code Quality', 'Production Readiness', 'Maintainability'];
 const ALL_SEVERITIES = ['Critical', 'Warning', 'Info'];
 
@@ -26,15 +24,22 @@ export default function Dashboard() {
         const pollStatus = async () => {
             try {
                 const res = await fetch(`${BACKEND}/result/${jobId}`);
-                if (!res.ok) throw new Error('Report not found or expired.');
+                // Only stop polling on a definitive 404 (job gone / expired).
+                // Transient network errors (wifi blip, 5xx) should silently retry.
+                if (res.status === 404) {
+                    setError('Report not found or expired.');
+                    clearInterval(intervalId);
+                    return;
+                }
+                if (!res.ok) return; // non-404 error: silently retry next tick
                 const data = await res.json();
                 setJob(data);
                 if (data.status === 'done' || data.status === 'error') {
                     clearInterval(intervalId);
                 }
             } catch (err) {
-                setError(err.message);
-                clearInterval(intervalId);
+                // Network-level failure (fetch threw) — silently retry, don't kill polling
+                console.warn('Poll failed, will retry:', err.message);
             }
         };
         pollStatus();
@@ -135,11 +140,15 @@ export default function Dashboard() {
     const severityCounts = { Critical: 0, Warning: 0, Info: 0 };
     issues.forEach(i => { if (severityCounts[i.severity] !== undefined) severityCounts[i.severity]++; });
 
-    // ── Filtered issues (memoized) ──────────────────────────────────────────
+    // ── Filtered issues (memoized) ───────────────────────────────────────────────────────
     const filteredIssues = useMemo(() => {
         return issues.filter(issue =>
             activeSeverities.has(issue.severity) &&
-            ALL_CATEGORIES.some(cat => issue.category.includes(cat.split(' ')[0]) && activeCategories.has(cat))
+            ALL_CATEGORIES.some(cat =>
+                // Full case-insensitive match against the complete category string
+                issue.category.toLowerCase() === cat.toLowerCase() &&
+                activeCategories.has(cat)
+            )
         );
     }, [issues, activeSeverities, activeCategories]);
 

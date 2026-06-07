@@ -20,8 +20,8 @@ function getFileWeight(path) {
         return 0;
     }
 
-    // Entry points
-    if (path.match(/^(index|app|server|main)\.(js|ts)$/)) return 10;
+    // Entry points — match at root OR inside any subdirectory (e.g. src/index.js)
+    if (path.match(/(^|\/)((index|app|server|main)\.(js|ts))$/)) return 10;
     
     // Auth, Middleware
     if (path.match(/(auth|login|register|middleware)/)) return 9;
@@ -45,11 +45,14 @@ function getFileWeight(path) {
  * Prioritizes a list of files and enforces a context budget.
  */
 async function prioritizeFiles(files, maxTokens = 80000, fetchContentFn) {
-    // 1. Assign weights
-    const scoredFiles = files.map(f => ({
-        ...f,
-        weight: getFileWeight(f.path)
-    })).filter(f => f.weight > 0);
+    // 1. Assign weights and pre-filter:
+    //    - Zero-weight files (node_modules, images, etc.)
+    //    - Files over 150KB — likely minified bundles or lock files, not useful for LLM analysis
+    const MAX_FILE_SIZE_BYTES = 150 * 1024;
+    const scoredFiles = files
+        .filter(f => !f.size || f.size < MAX_FILE_SIZE_BYTES)
+        .map(f => ({ ...f, weight: getFileWeight(f.path) }))
+        .filter(f => f.weight > 0);
 
     // 2. Sort by descending weight
     scoredFiles.sort((a, b) => b.weight - a.weight);
