@@ -18,7 +18,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors());
+// Restrict CORS to the configured frontend origin.
+// Defaults to localhost:5173 for local dev; set FRONTEND_URL in production.
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({ origin: allowedOrigin }));
 app.use(express.json());
 
 // Rate limiter: max 5 analysis requests per IP per 15 minutes
