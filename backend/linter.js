@@ -1,19 +1,12 @@
 const { ESLint } = require("eslint");
 
 // Create one ESLint instance at module load time (not per-job).
-// Config is static so there's no benefit to re-instantiating it on every call.
+// Pinned to ESLint v8 API: useEslintrc + overrideConfig object.
 const eslint = new ESLint({
     useEslintrc: false,
     overrideConfig: {
-        env: {
-            node: true,
-            es2021: true,
-            browser: true,
-        },
-        parserOptions: {
-            ecmaVersion: "latest",
-            sourceType: "module",
-        },
+        env: { node: true, es2021: true, browser: true },
+        parserOptions: { ecmaVersion: "latest", sourceType: "module" },
         rules: {
             "no-unused-vars": "warn",
             "no-undef": "warn",
