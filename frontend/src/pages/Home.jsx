@@ -57,37 +57,21 @@ export default function Home() {
 
     return (
         <div className={`home-root${mounted ? ' mounted' : ''}`}>
-
-            {/* Grid overlay */}
-            <div className="grid-overlay" aria-hidden="true" />
-
-            {/* Floating orbs */}
-            <div className="orb orb-1" aria-hidden="true" />
-            <div className="orb orb-2" aria-hidden="true" />
-            <div className="orb orb-3" aria-hidden="true" />
-
             <div className="home-content">
-
                 {/* ── Hero ── */}
                 <section className="hero">
-                    <div className="hero-pill">
-                        <span className="pill-dot" />
-                        Hybrid Static + AI Analysis
-                    </div>
-
                     <h1 className="hero-title">
-                        Instant code health<br />
-                        for any <span className="gradient-text">GitHub repo</span>
+                        Audit your <span className="gradient-text">GitHub</span> repositories
                     </h1>
 
                     <p className="hero-sub">
-                        Paste a public GitHub URL and get a structured security, scalability,
-                        and code quality report — powered by static analysis + Llama 3.3.
+                        Paste a public GitHub URL to run a hybrid static and LLM-powered 
+                        security, scalability, and code quality analysis.
                     </p>
 
                     {/* Search bar */}
                     <form onSubmit={handleSubmit} className={`search-wrap${error ? ' error' : ''}`}>
-                        <div className="search-bar glass-panel">
+                        <div className="search-bar">
                             <GitBranch size={18} className="search-gh-icon" />
                             <input
                                 className="search-input"
@@ -100,10 +84,11 @@ export default function Home() {
                                 spellCheck={false}
                             />
                             <button type="submit" className="search-btn" disabled={isLoading}>
-                                {isLoading
-                                    ? <span className="btn-loader" />
-                                    : <><span>Analyze</span><ArrowRight size={16} /></>
-                                }
+                                {isLoading ? (
+                                    <span className="btn-loader" />
+                                ) : (
+                                    <span>Analyze</span>
+                                )}
                             </button>
                         </div>
                         {error && <p className="search-error">{error}</p>}
@@ -111,7 +96,7 @@ export default function Home() {
 
                     {/* Example links */}
                     <div className="examples">
-                        <span className="examples-label">Try:</span>
+                        <span className="examples-label">Try an example:</span>
                         {EXAMPLES.map(url => (
                             <button
                                 key={url}
@@ -124,47 +109,31 @@ export default function Home() {
                     </div>
                 </section>
 
-                {/* ── Stats bar ── */}
-                <div className="stats-bar">
-                    {[
-                        { val: '5', label: 'Analysis dimensions' },
-                        { val: '4', label: 'Static detectors' },
-                        { val: 'OSV', label: 'Vulnerability DB' },
-                        { val: 'LLM', label: 'Llama 3.3 70B' },
-                    ].map(s => (
-                        <div className="stat-item" key={s.label}>
-                            <span className="stat-val gradient-text">{s.val}</span>
-                            <span className="stat-label">{s.label}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* ── Feature cards ── */}
+                {/* ── Features ── */}
                 <div className="features">
                     {[
                         {
-                            icon: <ShieldCheck size={22} />,
-                            title: 'Security First',
-                            desc: 'Detects hardcoded secrets, vulnerable dependencies via OSV, and missing security middleware.',
-                            accent: '#7c3aed',
+                            icon: <ShieldCheck size={20} />,
+                            title: 'Security Scanning',
+                            desc: 'Detects hardcoded secrets, vulnerable dependencies via OSV, and missing security headers.',
                         },
                         {
-                            icon: <Zap size={22} />,
-                            title: 'Static + AI',
-                            desc: 'Combines deterministic ESLint/regex scanning with contextual Llama 3.3 architectural review.',
-                            accent: '#2563eb',
+                            icon: <Zap size={20} />,
+                            title: 'Static + AI Analysis',
+                            desc: 'Combines deterministic AST scanning with contextual architectural review.',
                         },
                         {
-                            icon: <Activity size={22} />,
-                            title: 'Weighted Scoring',
-                            desc: 'A 5-category rubric — Security 30%, Scalability 20%, Quality 20%, Production 20%, Maintainability 10%.',
-                            accent: '#0891b2',
+                            icon: <Activity size={20} />,
+                            title: 'Health Scoring',
+                            desc: 'Rubric-based evaluation covering Security, Scalability, Quality, and Maintainability.',
                         },
                     ].map(f => (
-                        <div className="feature-card glass-panel" key={f.title} style={{ '--card-accent': f.accent }}>
+                        <div className="feature-card glass-panel" key={f.title}>
                             <div className="feature-icon">{f.icon}</div>
-                            <h3 className="feature-title">{f.title}</h3>
-                            <p className="feature-desc">{f.desc}</p>
+                            <div>
+                                <h3 className="feature-title">{f.title}</h3>
+                                <p className="feature-desc">{f.desc}</p>
+                            </div>
                         </div>
                     ))}
                 </div>

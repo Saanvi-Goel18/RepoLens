@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShieldAlert, AlertTriangle, Info, ChevronDown, ChevronRight, Activity, ArrowLeft, Copy, Check, ExternalLink, SlidersHorizontal, X } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Info, ChevronDown, Activity, ArrowLeft, Copy, Check, ExternalLink, SlidersHorizontal, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './Dashboard.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -56,6 +58,74 @@ export default function Dashboard() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const generatePDF = () => {
+        if (!job) return;
+        const doc = new jsPDF();
+        const { overallScore, categoryScores } = job.result;
+        const issuesList = job.result.issues || [];
+        
+        // Native GitHub colors for the PDF
+        const primaryColor = [47, 129, 247]; // GitHub Blue
+        const textColor = [40, 40, 40];
+
+        doc.setFontSize(22);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("RepoLens Audit Report", 14, 22);
+
+        doc.setFontSize(11);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Repository: ${job.repoUrl}`, 14, 30);
+        doc.text(`Date: ${new Date(job.createdAt).toLocaleString()}`, 14, 36);
+        doc.text(`Files Scanned: ${job.stats?.filesAnalyzed || '?'}`, 14, 42);
+
+        doc.setFontSize(16);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(`Overall Health Score: ${overallScore}/100`, 14, 54);
+
+        doc.setFontSize(12);
+        let startY = 62;
+        Object.entries(categoryScores).forEach(([cat, score]) => {
+            doc.text(`${cat.charAt(0).toUpperCase() + cat.slice(1)}: ${score}/100`, 14, startY);
+            startY += 6;
+        });
+
+        if (issuesList.length > 0) {
+            const tableData = issuesList.map(issue => [
+                issue.severity,
+                issue.category,
+                `${issue.file}:${issue.line}`,
+                issue.description,
+                issue.fix
+            ]);
+
+            autoTable(doc, {
+                startY: startY + 8,
+                head: [['Severity', 'Category', 'Location', 'Description', 'Fix']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: primaryColor },
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 20 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 40 },
+                    3: { cellWidth: 'auto' },
+                    4: { cellWidth: 50 }
+                },
+                didParseCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 0) {
+                        if (data.cell.raw === 'Critical') data.cell.styles.textColor = [218, 54, 51]; // GitHub Red
+                        else if (data.cell.raw === 'Warning') data.cell.styles.textColor = [210, 153, 34]; // GitHub Yellow
+                        else if (data.cell.raw === 'Info') data.cell.styles.textColor = [56, 139, 253]; // GitHub Blue
+                    }
+                }
+            });
+        }
+
+        const repoName = job.repoUrl.split('/').pop() || 'repo';
+        doc.save(`RepoLens_Report_${repoName}.pdf`);
+    };
+
     const toggleSeverity = (sev) => {
         const next = new Set(activeSeverities);
         next.has(sev) ? next.delete(sev) : next.add(sev);
@@ -93,7 +163,7 @@ export default function Dashboard() {
         return (
             <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
-                    <ShieldAlert size={48} className="state-icon text-danger" />
+                    <ShieldAlert size={40} className="state-icon text-danger" />
                     <h2>Failed to load report</h2>
                     <p>{error}</p>
                     <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Back to Home</Link>
@@ -106,14 +176,14 @@ export default function Dashboard() {
         const statusMessages = {
             queued:    { text: 'Queued for analysis...', sub: 'Starting up the pipeline.' },
             fetching:  { text: 'Fetching repository...', sub: 'Pulling file tree and source files from GitHub.' },
-            analyzing: { text: 'Running analysis engines...', sub: 'Static detectors and LLM are working in parallel.' },
+            analyzing: { text: 'Running analysis...', sub: 'Static detectors and LLM are working in parallel.' },
         };
         const msg = statusMessages[job?.status] || { text: 'Preparing...', sub: 'Hang tight.' };
         return (
             <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
                     <div className="spinner-ring" />
-                    <h2 className="gradient-text">{msg.text}</h2>
+                    <h2>{msg.text}</h2>
                     <p>{msg.sub}</p>
                     <p className="muted-hint">Usually takes 15–45 seconds depending on repo size.</p>
                 </div>
@@ -125,7 +195,7 @@ export default function Dashboard() {
         return (
             <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
-                    <AlertTriangle size={48} className="state-icon text-warn" />
+                    <AlertTriangle size={40} className="state-icon text-warn" />
                     <h2>Analysis failed</h2>
                     <p>{job.error}</p>
                     <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Try another repo</Link>
@@ -172,13 +242,18 @@ export default function Dashboard() {
                         Analyzed on {new Date(job.createdAt).toLocaleString()} • {job.stats?.filesAnalyzed || '?'} files scanned
                     </p>
                 </div>
-                <button className={`share-btn ${copied ? 'copied' : ''}`} onClick={copyShareLink}>
-                    {copied ? <><Check size={14}/> Copied</> : <><Copy size={14}/> Copy Link</>}
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn-secondary" onClick={generatePDF}>
+                        <Download size={14}/> Download PDF
+                    </button>
+                    <button className={`btn-secondary ${copied ? 'copied' : ''}`} onClick={copyShareLink}>
+                        {copied ? <><Check size={14}/> Copied</> : <><Copy size={14}/> Copy Link</>}
+                    </button>
+                </div>
             </div>
 
             {/* ── Scores Grid ── */}
-            <div className="scores-grid animate-scale-in" style={{ animationDelay: '0.1s' }}>
+            <div className="scores-grid animate-scale-in" style={{ animationDelay: '0.05s' }}>
                 
                 {/* Overall Score Circle */}
                 <div className="glass-panel overall-card">
@@ -228,7 +303,7 @@ export default function Dashboard() {
             </div>
 
             {/* ── Filters ── */}
-            <div className="filters-bar animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <div className="filters-bar animate-scale-in" style={{ animationDelay: '0.1s' }}>
                 <div className="filter-label"><SlidersHorizontal size={14}/> Filters:</div>
                 
                 <div className="filters-group">
@@ -238,12 +313,12 @@ export default function Dashboard() {
                             className={`filter-btn ${activeSeverities.has(sev) ? 'active' : ''}`}
                             onClick={() => toggleSeverity(sev)}
                         >
-                            {sev} ({severityCounts[sev]})
+                            {sev} <span className="filter-count">{severityCounts[sev]}</span>
                         </button>
                     ))}
                 </div>
                 
-                <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
+                <div className="filter-divider" />
 
                 <div className="filters-group">
                     {ALL_CATEGORIES.map(cat => (
@@ -267,8 +342,8 @@ export default function Dashboard() {
             {/* ── Issues List ── */}
             <div className="issues-list">
                 {filteredIssues.length === 0 ? (
-                    <div className="empty-state animate-fade-in" style={{ animationDelay: '0.3s' }}>
-                        <Check size={40} className="state-icon" style={{ color: 'var(--green)' }}/>
+                    <div className="empty-state animate-fade-in" style={{ animationDelay: '0.15s' }}>
+                        <Check size={32} className="state-icon" style={{ color: 'var(--green)' }}/>
                         <h3>No issues found</h3>
                         <p>No issues match the current filter criteria.</p>
                         {isFiltered && <button className="btn-primary" onClick={clearFilters}>Clear Filters</button>}
@@ -280,20 +355,20 @@ export default function Dashboard() {
                             <div 
                                 key={index} 
                                 className={`issue-card severity-${issue.severity} animate-fade-in`}
-                                style={{ animationDelay: `${0.3 + (index * 0.05)}s` }}
+                                style={{ animationDelay: `${0.15 + (index * 0.02)}s` }}
                             >
                                 <div className="issue-header" onClick={() => toggleIssue(index)}>
                                     <div className="issue-icon">{iconMap[issue.severity]}</div>
                                     <div className="issue-summary">
                                         <div className="issue-meta">
-                                            <span className="badge">{issue.severity}</span>
-                                            <span className="badge">{issue.category}</span>
+                                            <span className={`badge badge-${issue.severity}`}>{issue.severity}</span>
+                                            <span className="badge badge-outline">{issue.category}</span>
                                             <span className="file-loc">{issue.file}:{issue.line}</span>
                                         </div>
                                         <h4 className="issue-desc">{issue.description}</h4>
                                     </div>
                                     <div className={`issue-expand ${isExpanded ? 'open' : ''}`}>
-                                        <ChevronDown size={20} />
+                                        <ChevronDown size={16} />
                                     </div>
                                 </div>
                                 {isExpanded && (

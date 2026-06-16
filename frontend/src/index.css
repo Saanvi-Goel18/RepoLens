@@ -1,40 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Core palette — deep space */
-  --bg-void:    #04040a;
-  --bg-base:    #080812;
-  --bg-surface: #0e0e1a;
-  --bg-raised:  #141426;
-  --bg-hover:   #1a1a30;
+  /* GitHub Dark Palette */
+  --bg-void:    #0d1117; /* Main background */
+  --bg-base:    #0d1117;
+  --bg-surface: #161b22; /* Card/Panel background */
+  --bg-raised:  #21262d; /* Button background */
+  --bg-hover:   #30363d;
 
-  --border:       rgba(255,255,255,0.07);
-  --border-glow:  rgba(139,92,246,0.25);
+  --border:       #30363d;
+  --border-glow:  #58a6ff;
 
-  --text-1: #f0f0ff;
-  --text-2: #8b8ba8;
-  --text-3: #55556b;
+  --text-1: #c9d1d9; /* Main text */
+  --text-2: #8b949e; /* Muted text */
+  --text-3: #484f58; /* Very muted */
 
-  /* Accent — electric violet → cyan */
-  --a1: #7c3aed;
-  --a2: #6366f1;
-  --a3: #38bdf8;
-  --grad: linear-gradient(135deg, var(--a1), var(--a2));
-  --grad-h: linear-gradient(135deg, #8b5cf6, #818cf8);
+  /* Accents */
+  --a1: #2f81f7; /* GitHub Primary Blue */
+  --a2: #58a6ff;
+  --a3: #79c0ff;
+  --grad: var(--a2); /* Flat color instead of gradient for a cleaner look */
+  --grad-h: var(--a3);
 
-  /* Status */
-  --green:  #22d3a5;
-  --yellow: #fbbf24;
-  --red:    #f87171;
-  --blue:   #60a5fa;
+  /* Status Colors (GitHub style) */
+  --green:  #238636; /* Passing / Excellent */
+  --green-hover: #2ea043;
+  --yellow: #d29922; /* Warning */
+  --red:    #da3633; /* Critical / Error */
+  --red-hover: #f85149;
+  --blue:   #388bfd; /* Info */
 
-  --font: 'Inter', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  /* Snappier border radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,44 +48,14 @@ body {
   background: var(--bg-void);
   color: var(--text-1);
   font-family: var(--font);
-  line-height: 1.6;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* ── Aurora background blobs ── */
-body::before, body::after {
-  content: '';
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(100px);
-  pointer-events: none;
-  z-index: 0;
-  animation: floatBlob 14s ease-in-out infinite alternate;
-}
-body::before {
-  width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
-  top: -200px; left: -200px;
-}
-body::after {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(56,189,248,0.12) 0%, transparent 70%);
-  bottom: -200px; right: -200px;
-  animation-delay: -7s;
-  animation-duration: 18s;
-}
-
-@keyframes floatBlob {
-  0%   { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(40px, 30px) scale(1.08); }
-}
-
 /* ── Layout ── */
 .app-container {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -90,12 +63,10 @@ body::after {
 
 /* ── Header ── */
 .header {
-  padding: 0 32px;
+  padding: 0 24px;
   height: 64px;
   border-bottom: 1px solid var(--border);
-  background: rgba(4,4,10,0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -107,70 +78,59 @@ body::after {
 .logo-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
 }
 
 .logo-icon {
-  width: 34px;
-  height: 34px;
-  background: var(--grad);
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%; /* GitHub style round avatars/logos */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
-  box-shadow: 0 0 16px rgba(124,58,237,0.5);
-  transition: box-shadow 0.3s;
-}
-.logo-group:hover .logo-icon {
-  box-shadow: 0 0 24px rgba(124,58,237,0.8);
+  font-size: 16px;
+  color: var(--text-1);
 }
 
 .logo-text {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  background: var(--grad);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
 }
 
 .header-subtitle {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--text-3);
-  letter-spacing: 0.05em;
-  background: rgba(255,255,255,0.04);
+  color: var(--text-2);
+  background: transparent;
   border: 1px solid var(--border);
-  padding: 4px 12px;
-  border-radius: 100px;
+  padding: 2px 8px;
+  border-radius: 2em;
 }
 
 /* ── Main ── */
-.main-content { flex: 1; position: relative; z-index: 1; }
+.main-content { flex: 1; }
 
-/* ── Glass panel ── */
+/* ── Panels ── */
+/* Replaced glass-panel with a solid, flat card */
 .glass-panel {
-  background: rgba(14,14,26,0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-void);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
-/* ── Gradient text ── */
+/* ── Gradient text replacement ── */
+/* Keep the class name but make it a solid accent color for the native look */
 .gradient-text {
-  background: linear-gradient(135deg, #a78bfa, #38bdf8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--a2);
 }
 
-/* ── Animations ── */
+/* ── Snappier Animations ── */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
@@ -180,24 +140,13 @@ body::after {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
-}
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
 
-.animate-fade-in  { animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) forwards; }
-.animate-scale-in { animation: scaleIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+/* Reduced animation duration and distance for a more tool-like feel */
+.animate-fade-in  { animation: fadeUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-scale-in { animation: fadeIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-void); }
+::-webkit-scrollbar-thumb { background: var(--bg-raised); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
