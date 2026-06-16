@@ -28,42 +28,17 @@ async function analyzeWithLLM(files, staticIssues) {
         ? `\n--- STATIC ANALYSIS ISSUES FOUND ---\n${JSON.stringify(staticIssues, null, 2)}\n--- END STATIC ISSUES ---`
         : `\n--- NO STATIC ISSUES FOUND ---`;
 
-    const systemPrompt = `You are RepoLens, an expert AI code reviewer.
-Your job is to review a codebase and provide a structured health report based on a specific rubric.
-Review the provided files and the static analysis issues already found by our deterministic tools.
+    const systemPrompt = `You are RepoLens, an expert code reviewer. Score the codebase on 5 categories (0-100 each) and list specific issues found.
 
-RUBRIC CATEGORIES:
-1. Security (30% weight): Auth logic, JWTs, injection vulnerabilities, CORS, etc.
-2. Scalability (20% weight): N+1 queries, synchronous blocking ops, caching, pagination.
-3. Code Quality (20% weight): Consistent module systems, complexity, God objects, error handling.
-4. Production Readiness (20% weight): Env vars, structured logging, health checks, PM2/Docker config.
-5. Maintainability (10% weight): Folder structure, README quality, test presence.
+RUBRIC: Security (30%), Scalability (20%), Code Quality (20%), Production Readiness (20%), Maintainability (10%).
+Scoring guide: 85+ excellent, 65-84 good, 45-64 needs work, <45 critical issues. Typical vibe-coded app: 50-60.
 
-INSTRUCTIONS:
-1. Provide a score from 0-100 for each category based on your contextual review of the code.
-2. Provide a list of specific issues you find. Do NOT duplicate issues already in the static analysis.
-3. Focus on logical flaws, missing abstraction layers, architectural issues, etc.
-4. Be strict but fair. A standard vibe-coded app usually scores around 50-60.
+Do NOT duplicate issues already in the static analysis results. Focus on architecture, logic flaws, missing abstractions.
 
-CRITICAL: You MUST respond with ONLY valid JSON matching exactly this structure — no markdown, no explanation:
+RESPOND WITH ONLY THIS JSON — no markdown, no extra text:
 {
-  "categoryScores": {
-    "security": <number 0-100>,
-    "scalability": <number 0-100>,
-    "quality": <number 0-100>,
-    "production": <number 0-100>,
-    "maintainability": <number 0-100>
-  },
-  "issues": [
-    {
-      "category": <one of: "Security"|"Scalability"|"Code Quality"|"Production Readiness"|"Maintainability">,
-      "severity": <one of: "Critical"|"Warning"|"Info">,
-      "file": <string>,
-      "line": <number>,
-      "description": <string>,
-      "fix": <string>
-    }
-  ]
+  "categoryScores": { "security": 0-100, "scalability": 0-100, "quality": 0-100, "production": 0-100, "maintainability": 0-100 },
+  "issues": [{ "category": "Security|Scalability|Code Quality|Production Readiness|Maintainability", "severity": "Critical|Warning|Info", "file": "string", "line": 1, "description": "string", "fix": "string" }]
 }`;
 
     const userPrompt = `Please analyze the following codebase context and static analysis results.\n${staticContext}\n\n${fileContext}`;

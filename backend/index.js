@@ -147,9 +147,9 @@ async function runPipeline(job, owner, repo) {
     const allFiles = await fetchRepoTree(owner, repo);
 
     // 2. Prioritize and fetch contents
-    // Groq context limit is ~32k tokens total (prompt + response).
-    // 20k for file content leaves room for system prompt + response.
-    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 20000, async (path) => {
+    // Groq free tier TPM limit is 12,000 tokens/min per request.
+    // Budget: 7k file content + ~600 system prompt + ~200 user prefix + ~2k response = ~9.8k total.
+    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 7000, async (path) => {
         return await fetchFileContent(owner, repo, path);
     });
 
