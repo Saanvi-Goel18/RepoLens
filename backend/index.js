@@ -146,8 +146,10 @@ async function runPipeline(job, owner, repo) {
     // 1. Fetch File Tree
     const allFiles = await fetchRepoTree(owner, repo);
 
-    // 2. Prioritize and fetch contents (max 80k tokens)
-    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 80000, async (path) => {
+    // 2. Prioritize and fetch contents
+    // Groq context limit is ~32k tokens total (prompt + response).
+    // 20k for file content leaves room for system prompt + response.
+    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 20000, async (path) => {
         return await fetchFileContent(owner, repo, path);
     });
 
