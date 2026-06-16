@@ -97,7 +97,7 @@ GitHub URL
 | Backend Runtime | Node.js + Express | Non-blocking I/O for concurrent API calls |
 | GitHub Integration | Octokit (REST) | Official GitHub SDK, handles auth & rate limits |
 | Token Management | tiktoken | Exact token counting (not estimation) for GPT context budget |
-| LLM | OpenAI GPT-4o-mini | Best speed/cost ratio for structured output; `json_schema` response format enforces deterministic output |
+| LLM | Groq (llama-3.3-70b-versatile) | Free API, OpenAI-compatible, fast inference; `json_object` response format ensures structured output |
 | Vulnerability Data | OSV API (batch) | Free, open, authoritative vulnerability database — no API key needed |
 | Frontend | React + Vite | Fast HMR during development, optimized production builds |
 | Routing | React Router v6 | Client-side routing for `/` and `/r/:jobId` report pages |
