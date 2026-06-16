@@ -9,7 +9,7 @@ function detectVibeIssues(files) {
     
     // Check for express-rate-limit and auth routes
     for (const file of files) {
-        if (file.content.includes('express-rate-limit')) {
+        if (file.content.match(/rate-?limit|throttl/i)) {
             hasExpressRateLimit = true;
         }
         if (file.path.match(/(auth|login|register)/i) || file.content.match(/app\.(post|get)\(['"]\/(login|register|auth|api)/i)) {
@@ -23,7 +23,7 @@ function detectVibeIssues(files) {
             severity: "Critical",
             file: "Global",
             line: 1,
-            description: "Auth routes detected but 'express-rate-limit' (or similar) is not used.",
+            description: "Auth routes detected but no rate limiting middleware ('express-rate-limit', 'throttler', etc.) appears to be used.",
             fix: "Install and configure a rate limiter to prevent brute-force attacks on your authentication endpoints."
         });
     }

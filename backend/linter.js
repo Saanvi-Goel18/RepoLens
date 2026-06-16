@@ -11,7 +11,20 @@ const eslint = new ESLint({
             "no-unused-vars": "warn",
             "no-undef": "warn",
             "no-unreachable": "warn"
-        }
+        },
+        overrides: [
+            {
+                files: ["**/*.ts", "**/*.tsx"],
+                parser: "@typescript-eslint/parser",
+                plugins: ["@typescript-eslint"],
+                rules: {
+                    // Turn off JS-specific rules that fail on TS syntax
+                    "no-undef": "off",
+                    "no-unused-vars": "off",
+                    "@typescript-eslint/no-unused-vars": "warn"
+                }
+            }
+        ]
     }
 });
 

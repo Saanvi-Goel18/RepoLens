@@ -23,6 +23,9 @@ function getFileWeight(path) {
     // Entry points — match at root OR inside any subdirectory (e.g. src/index.js)
     if (path.match(/(^|\/)((index|app|server|main)\.(js|ts))$/)) return 10;
     
+    // Critical configs (ensure .env.example is always included)
+    if (path.match(/(^|\/)\.env(\.example)?$/)) return 10;
+    
     // Auth, Middleware
     if (path.match(/(auth|login|register|middleware)/)) return 9;
     
@@ -49,8 +52,21 @@ async function prioritizeFiles(files, maxTokens = 80000, fetchContentFn) {
     //    - Zero-weight files (node_modules, images, etc.)
     //    - Files over 150KB — likely minified bundles or lock files, not useful for LLM analysis
     const MAX_FILE_SIZE_BYTES = 150 * 1024;
+    
+    // Build a set of base paths for TypeScript files to filter out compiled JS counterparts
+    const tsPaths = new Set(
+        files.filter(f => f.path.match(/\.tsx?$/)).map(f => f.path.replace(/\.tsx?$/, ''))
+    );
+
     const scoredFiles = files
-        .filter(f => !f.size || f.size < MAX_FILE_SIZE_BYTES)
+        .filter(f => {
+            // Ignore compiled JS if TS equivalent exists in same dir
+            if (f.path.match(/\.jsx?$/)) {
+                const base = f.path.replace(/\.jsx?$/, '');
+                if (tsPaths.has(base)) return false;
+            }
+            return !f.size || f.size < MAX_FILE_SIZE_BYTES;
+        })
         .map(f => ({ ...f, weight: getFileWeight(f.path) }))
         .filter(f => f.weight > 0);
 

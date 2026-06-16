@@ -24,21 +24,18 @@ export default function Dashboard() {
         const pollStatus = async () => {
             try {
                 const res = await fetch(`${BACKEND}/result/${jobId}`);
-                // Only stop polling on a definitive 404 (job gone / expired).
-                // Transient network errors (wifi blip, 5xx) should silently retry.
                 if (res.status === 404) {
                     setError('Report not found or expired.');
                     clearInterval(intervalId);
                     return;
                 }
-                if (!res.ok) return; // non-404 error: silently retry next tick
+                if (!res.ok) return; 
                 const data = await res.json();
                 setJob(data);
                 if (data.status === 'done' || data.status === 'error') {
                     clearInterval(intervalId);
                 }
             } catch (err) {
-                // Network-level failure (fetch threw) — silently retry, don't kill polling
                 console.warn('Poll failed, will retry:', err.message);
             }
         };
@@ -63,7 +60,7 @@ export default function Dashboard() {
         const next = new Set(activeSeverities);
         next.has(sev) ? next.delete(sev) : next.add(sev);
         setActiveSeverities(next);
-        setExpandedIssues(new Set()); // collapse all on filter change
+        setExpandedIssues(new Set()); 
     };
 
     const toggleCategory = (cat) => {
@@ -78,7 +75,7 @@ export default function Dashboard() {
         setActiveCategories(new Set(ALL_CATEGORIES));
     };
 
-    // ── useMemo MUST be here — before any early returns (Rules of Hooks) ────
+    // ── useMemo MUST be here before early returns (Rules of Hooks) ────
     const issues = job?.result?.issues ?? [];
     const filteredIssues = useMemo(() => {
         return issues.filter(issue =>
@@ -94,9 +91,9 @@ export default function Dashboard() {
     // ── Loading / Error states ──────────────────────────────────────────────
     if (error) {
         return (
-            <div className="dashboard-container centered">
+            <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
-                    <ShieldAlert size={40} className="state-icon text-danger" />
+                    <ShieldAlert size={48} className="state-icon text-danger" />
                     <h2>Failed to load report</h2>
                     <p>{error}</p>
                     <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Back to Home</Link>
@@ -113,10 +110,10 @@ export default function Dashboard() {
         };
         const msg = statusMessages[job?.status] || { text: 'Preparing...', sub: 'Hang tight.' };
         return (
-            <div className="dashboard-container centered">
+            <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
                     <div className="spinner-ring" />
-                    <h2>{msg.text}</h2>
+                    <h2 className="gradient-text">{msg.text}</h2>
                     <p>{msg.sub}</p>
                     <p className="muted-hint">Usually takes 15–45 seconds depending on repo size.</p>
                 </div>
@@ -126,9 +123,9 @@ export default function Dashboard() {
 
     if (job.status === 'error') {
         return (
-            <div className="dashboard-container centered">
+            <div className="dashboard-container centered animate-fade-in">
                 <div className="state-card glass-panel">
-                    <AlertTriangle size={40} className="state-icon text-warn" />
+                    <AlertTriangle size={48} className="state-icon text-warn" />
                     <h2>Analysis failed</h2>
                     <p>{job.error}</p>
                     <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Try another repo</Link>
@@ -139,7 +136,7 @@ export default function Dashboard() {
 
     const { overallScore, categoryScores } = job.result;
 
-    const getScoreColor = (s) => s >= 75 ? 'var(--must)' : s >= 50 ? 'var(--warn)' : 'var(--danger)';
+    const getScoreColor = (s) => s >= 75 ? 'var(--green)' : s >= 50 ? 'var(--yellow)' : 'var(--red)';
     const getScoreLabel = (s) => s >= 85 ? 'Excellent' : s >= 75 ? 'Good' : s >= 50 ? 'Needs Attention' : 'Critical Issues';
 
     const categoryMeta = {
@@ -163,145 +160,152 @@ export default function Dashboard() {
         <div className="dashboard-container animate-fade-in">
 
             {/* ── Header ── */}
-            <div className="dashboard-header">
+            <div className="dashboard-header animate-scale-in">
                 <div>
                     <div className="repo-breadcrumb">
                         <a href={job.repoUrl} target="_blank" rel="noopener noreferrer" className="repo-link">
                             {job.repoUrl.replace('https://github.com/', '')}
-                            <ExternalLink size={14} />
+                            <ExternalLink size={16} />
                         </a>
                     </div>
                     <p className="report-meta">
-                        Report · {new Date(job.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        Analyzed on {new Date(job.createdAt).toLocaleString()} • {job.stats?.filesAnalyzed || '?'} files scanned
                     </p>
                 </div>
-                <div className="header-actions">
-                    <button className="btn-secondary" onClick={copyShareLink}>
-                        {copied ? <><Check size={15}/> Copied!</> : <><Copy size={15}/> Share</>}
-                    </button>
-                    <Link to="/" className="btn-secondary">New Scan</Link>
+                <button className={`share-btn ${copied ? 'copied' : ''}`} onClick={copyShareLink}>
+                    {copied ? <><Check size={14}/> Copied</> : <><Copy size={14}/> Copy Link</>}
+                </button>
+            </div>
+
+            {/* ── Scores Grid ── */}
+            <div className="scores-grid animate-scale-in" style={{ animationDelay: '0.1s' }}>
+                
+                {/* Overall Score Circle */}
+                <div className="glass-panel overall-card">
+                    <div className="circle-wrap">
+                        <svg className="circle-svg" viewBox="0 0 100 100">
+                            <circle className="circle-bg" cx="50" cy="50" r="46" />
+                            <circle 
+                                className="circle-prog" 
+                                cx="50" cy="50" r="46"
+                                style={{
+                                    strokeDasharray: `${(overallScore / 100) * 289} 289`,
+                                    color: getScoreColor(overallScore)
+                                }}
+                            />
+                        </svg>
+                        <div className="circle-inner">
+                            <span className="circle-score">{overallScore}</span>
+                            <span className="circle-max">/100</span>
+                        </div>
+                    </div>
+                    <h3 className="overall-label">{getScoreLabel(overallScore)}</h3>
+                    <p className="report-meta">Overall Health Score</p>
+                </div>
+
+                {/* Category Breakdown */}
+                <div className="glass-panel category-breakdown">
+                    {Object.entries(categoryScores).map(([key, score]) => (
+                        <div className="cat-item" key={key}>
+                            <div className="cat-header">
+                                <span className="cat-name">
+                                    {categoryMeta[key]?.emoji} {categoryMeta[key]?.label || key}
+                                </span>
+                                <span className="cat-score">{score}/100</span>
+                            </div>
+                            <div className="bar-bg">
+                                <div 
+                                    className="bar-fill" 
+                                    style={{ 
+                                        width: `${score}%`,
+                                        background: getScoreColor(score) 
+                                    }} 
+                                />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
-            {/* ── Score Panel ── */}
-            <div className="score-overview glass-panel">
-                <div className="overall-score-section">
-                    <div className="score-circle" style={{ '--score-color': getScoreColor(overallScore) }}>
-                        <span className="score-number">{overallScore}</span>
-                        <span className="score-max">/100</span>
-                    </div>
-                    <div className="score-verdict" style={{ color: getScoreColor(overallScore) }}>
-                        {getScoreLabel(overallScore)}
-                    </div>
-                    <div className="severity-pills">
-                        {severityCounts.Critical > 0 && <span className="pill pill-critical">{severityCounts.Critical} Critical</span>}
-                        {severityCounts.Warning > 0  && <span className="pill pill-warning">{severityCounts.Warning} Warning</span>}
-                        {severityCounts.Info > 0     && <span className="pill pill-info">{severityCounts.Info} Info</span>}
-                    </div>
+            {/* ── Filters ── */}
+            <div className="filters-bar animate-scale-in" style={{ animationDelay: '0.2s' }}>
+                <div className="filter-label"><SlidersHorizontal size={14}/> Filters:</div>
+                
+                <div className="filters-group">
+                    {ALL_SEVERITIES.map(sev => (
+                        <button
+                            key={sev}
+                            className={`filter-btn ${activeSeverities.has(sev) ? 'active' : ''}`}
+                            onClick={() => toggleSeverity(sev)}
+                        >
+                            {sev} ({severityCounts[sev]})
+                        </button>
+                    ))}
+                </div>
+                
+                <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
+
+                <div className="filters-group">
+                    {ALL_CATEGORIES.map(cat => (
+                        <button
+                            key={cat}
+                            className={`filter-btn ${activeCategories.has(cat) ? 'active' : ''}`}
+                            onClick={() => toggleCategory(cat)}
+                        >
+                            {cat}
+                        </button>
+                    ))}
                 </div>
 
-                <div className="category-scores">
-                    {Object.entries(categoryScores).map(([key, score]) => {
-                        const meta = categoryMeta[key] || { label: key, emoji: '' };
+                {isFiltered && (
+                    <button className="filter-clear" onClick={clearFilters}>
+                        Clear filters
+                    </button>
+                )}
+            </div>
+
+            {/* ── Issues List ── */}
+            <div className="issues-list">
+                {filteredIssues.length === 0 ? (
+                    <div className="empty-state animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                        <Check size={40} className="state-icon" style={{ color: 'var(--green)' }}/>
+                        <h3>No issues found</h3>
+                        <p>No issues match the current filter criteria.</p>
+                        {isFiltered && <button className="btn-primary" onClick={clearFilters}>Clear Filters</button>}
+                    </div>
+                ) : (
+                    filteredIssues.map((issue, index) => {
+                        const isExpanded = expandedIssues.has(index);
                         return (
-                            <div className="score-row" key={key}>
-                                <div className="score-name">
-                                    <span className="score-emoji">{meta.emoji}</span>
-                                    {meta.label}
+                            <div 
+                                key={index} 
+                                className={`issue-card severity-${issue.severity} animate-fade-in`}
+                                style={{ animationDelay: `${0.3 + (index * 0.05)}s` }}
+                            >
+                                <div className="issue-header" onClick={() => toggleIssue(index)}>
+                                    <div className="issue-icon">{iconMap[issue.severity]}</div>
+                                    <div className="issue-summary">
+                                        <div className="issue-meta">
+                                            <span className="badge">{issue.severity}</span>
+                                            <span className="badge">{issue.category}</span>
+                                            <span className="file-loc">{issue.file}:{issue.line}</span>
+                                        </div>
+                                        <h4 className="issue-desc">{issue.description}</h4>
+                                    </div>
+                                    <div className={`issue-expand ${isExpanded ? 'open' : ''}`}>
+                                        <ChevronDown size={20} />
+                                    </div>
                                 </div>
-                                <div className="score-bar-track">
-                                    <div className="score-bar-fill" style={{ width: `${score}%`, backgroundColor: getScoreColor(score) }} />
-                                </div>
-                                <div className="score-val" style={{ color: getScoreColor(score) }}>{score}</div>
+                                {isExpanded && (
+                                    <div className="issue-body">
+                                        <div className="fix-label">Recommended Fix</div>
+                                        <p className="issue-fix">{issue.fix}</p>
+                                    </div>
+                                )}
                             </div>
                         );
-                    })}
-                </div>
-            </div>
-
-            {/* ── Issues Section ── */}
-            <div className="issues-section">
-                <div className="issues-toolbar">
-                    <h2 className="section-title">
-                        Detected Issues
-                        <span className="issue-count">{filteredIssues.length}{isFiltered ? ` of ${issues.length}` : ''}</span>
-                    </h2>
-
-                    <div className="filter-group">
-                        <SlidersHorizontal size={14} className="filter-icon" />
-
-                        {/* Severity filters */}
-                        {ALL_SEVERITIES.map(sev => (
-                            <button
-                                key={sev}
-                                onClick={() => toggleSeverity(sev)}
-                                className={`filter-chip filter-chip-${sev.toLowerCase()}${activeSeverities.has(sev) ? ' active' : ''}`}
-                            >
-                                {sev}
-                            </button>
-                        ))}
-
-                        <div className="filter-divider" />
-
-                        {/* Category filters */}
-                        {ALL_CATEGORIES.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => toggleCategory(cat)}
-                                className={`filter-chip filter-chip-cat${activeCategories.has(cat) ? ' active' : ''}`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-
-                        {isFiltered && (
-                            <button onClick={clearFilters} className="filter-clear">
-                                <X size={12}/> Clear
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="issues-list glass-panel">
-                    {issues.length === 0 ? (
-                        <div className="no-issues">
-                            <Check size={32} style={{ color: 'var(--must)', marginBottom: 12 }} />
-                            <p>No issues detected. This repo looks solid.</p>
-                        </div>
-                    ) : filteredIssues.length === 0 ? (
-                        <div className="no-issues">
-                            <p>No issues match your current filters.</p>
-                            <button onClick={clearFilters} className="btn-secondary" style={{ marginTop: 12 }}>Clear Filters</button>
-                        </div>
-                    ) : (
-                        filteredIssues.map((issue, idx) => {
-                            const isExpanded = expandedIssues.has(idx);
-                            return (
-                                <div className={`issue-item${isExpanded ? ' expanded' : ''}`} key={idx}>
-                                    <div className="issue-header" onClick={() => toggleIssue(idx)}>
-                                        <div className="issue-icon">{iconMap[issue.severity]}</div>
-                                        <div className="issue-content">
-                                            <div className="issue-meta">
-                                                <span className={`chip chip-${issue.severity.toLowerCase()}`}>{issue.category}</span>
-                                                <span className="issue-file">{issue.file}:{issue.line}</span>
-                                            </div>
-                                            <div className="issue-desc">{issue.description}</div>
-                                        </div>
-                                        <div className="issue-toggle">
-                                            {isExpanded ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
-                                        </div>
-                                    </div>
-                                    {isExpanded && (
-                                        <div className="issue-details">
-                                            <div className="fix-label">Suggested Fix</div>
-                                            <div className="fix-content">{issue.fix}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
+                    })
+                )}
             </div>
         </div>
     );
