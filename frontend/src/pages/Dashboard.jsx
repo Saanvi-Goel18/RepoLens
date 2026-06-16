@@ -78,6 +78,19 @@ export default function Dashboard() {
         setActiveCategories(new Set(ALL_CATEGORIES));
     };
 
+    // ── useMemo MUST be here — before any early returns (Rules of Hooks) ────
+    const issues = job?.result?.issues ?? [];
+    const filteredIssues = useMemo(() => {
+        return issues.filter(issue =>
+            activeSeverities.has(issue.severity) &&
+            ALL_CATEGORIES.some(cat =>
+                issue.category.toLowerCase() === cat.toLowerCase() &&
+                activeCategories.has(cat)
+            )
+        );
+    }, [issues, activeSeverities, activeCategories]);
+    const isFiltered = activeSeverities.size < ALL_SEVERITIES.length || activeCategories.size < ALL_CATEGORIES.length;
+
     // ── Loading / Error states ──────────────────────────────────────────────
     if (error) {
         return (
@@ -124,7 +137,7 @@ export default function Dashboard() {
         );
     }
 
-    const { overallScore, categoryScores, issues } = job.result;
+    const { overallScore, categoryScores } = job.result;
 
     const getScoreColor = (s) => s >= 75 ? 'var(--must)' : s >= 50 ? 'var(--warn)' : 'var(--danger)';
     const getScoreLabel = (s) => s >= 85 ? 'Excellent' : s >= 75 ? 'Good' : s >= 50 ? 'Needs Attention' : 'Critical Issues';
@@ -139,20 +152,6 @@ export default function Dashboard() {
 
     const severityCounts = { Critical: 0, Warning: 0, Info: 0 };
     issues.forEach(i => { if (severityCounts[i.severity] !== undefined) severityCounts[i.severity]++; });
-
-    // ── Filtered issues (memoized) ───────────────────────────────────────────────────────
-    const filteredIssues = useMemo(() => {
-        return issues.filter(issue =>
-            activeSeverities.has(issue.severity) &&
-            ALL_CATEGORIES.some(cat =>
-                // Full case-insensitive match against the complete category string
-                issue.category.toLowerCase() === cat.toLowerCase() &&
-                activeCategories.has(cat)
-            )
-        );
-    }, [issues, activeSeverities, activeCategories]);
-
-    const isFiltered = activeSeverities.size < ALL_SEVERITIES.length || activeCategories.size < ALL_CATEGORIES.length;
 
     const iconMap = {
         Critical: <ShieldAlert size={16} className="text-danger" />,
