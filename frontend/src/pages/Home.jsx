@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, Activity, GitBranch } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, Activity, GitBranch, Bot, TrendingUp, Code2, Lock } from 'lucide-react';
 import './Home.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -17,9 +17,36 @@ export default function Home() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [mounted, setMounted] = useState(false);
+    const [token, setToken] = useState(localStorage.getItem('github_token'));
     const navigate = useNavigate();
 
-    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => { 
+        setMounted(true); 
+        
+        // Handle OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+            localStorage.setItem('github_token', urlToken);
+            setToken(urlToken);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
+    const handleLogin = () => {
+        const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+        if (!clientId) {
+            setError('GitHub Client ID is not configured in the frontend .env file.');
+            return;
+        }
+        window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo`;
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('github_token');
+        setToken(null);
+    };
 
     const validate = (url) => {
         if (!url.trim()) return 'Please enter a GitHub repository URL.';
@@ -35,9 +62,14 @@ export default function Home() {
         setIsLoading(true);
         setError(null);
         try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch(`${BACKEND}/analyze`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ repoUrl: repoUrl.trim() })
             });
             const data = await response.json();
@@ -60,6 +92,18 @@ export default function Home() {
             <div className="home-content">
                 {/* ── Hero ── */}
                 <section className="hero">
+                    <div style={{ alignSelf: 'flex-end', marginBottom: '16px' }}>
+                        {token ? (
+                            <button className="example-tag" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <GitBranch size={14}/> Connected to GitHub (Logout)
+                            </button>
+                        ) : (
+                            <button className="example-tag" onClick={handleLogin} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-1)' }}>
+                                <GitBranch size={14}/> Sign in with GitHub (for Private Repos)
+                            </button>
+                        )}
+                    </div>
+                    
                     <h1 className="hero-title">
                         Audit your <span className="gradient-text">GitHub</span> repositories
                     </h1>
@@ -137,6 +181,33 @@ export default function Home() {
                         </div>
                     ))}
                 </div>
+
+                {/* ── Roadmap (Future Features) ── */}
+                <section className="roadmap-section">
+                    <h2 className="roadmap-title">What Else Can RepoLens Do? <br/><span className="gradient-text text-sm">(Future Features)</span></h2>
+                    <div className="roadmap-grid">
+                        <div className="roadmap-card glass-panel">
+                            <div className="roadmap-icon"><Bot size={24} /></div>
+                            <h3>GitHub PR Bot Integration 🤖</h3>
+                            <p>Automatically analyze only the changed files and leave inline comments on Pull Requests for missed vulnerabilities.</p>
+                        </div>
+                        <div className="roadmap-card glass-panel">
+                            <div className="roadmap-icon"><TrendingUp size={24} /></div>
+                            <h3>Historical Trending & Tracking 📈</h3>
+                            <p>Save scans over time and show a dashboard graph of repo health to answer: "Are we getting better or worse?"</p>
+                        </div>
+                        <div className="roadmap-card glass-panel">
+                            <div className="roadmap-icon"><Code2 size={24} /></div>
+                            <h3>Language Expansion 🐍🦀</h3>
+                            <p>Expanding the heuristic engines to fully support Python (bandit/flake8) and Go (golangci-lint).</p>
+                        </div>
+                        <div className="roadmap-card glass-panel">
+                            <div className="roadmap-icon"><Lock size={24} /></div>
+                            <h3>Private Repo Support 🔐</h3>
+                            <p>Connect your GitHub account securely via OAuth to analyze your company's private codebases.</p>
+                        </div>
+                    </div>
+                </section>
 
             </div>
         </div>

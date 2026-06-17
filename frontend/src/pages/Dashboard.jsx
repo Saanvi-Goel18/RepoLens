@@ -18,8 +18,8 @@ export default function Dashboard() {
     const [copied, setCopied] = useState(false);
 
     // ── Filter state ────────────────────────────────────────────────────────
-    const [activeSeverities, setActiveSeverities] = useState(new Set(ALL_SEVERITIES));
-    const [activeCategories, setActiveCategories] = useState(new Set(ALL_CATEGORIES));
+    const [activeSeverities, setActiveSeverities] = useState(new Set());
+    const [activeCategories, setActiveCategories] = useState(new Set());
 
     useEffect(() => {
         let intervalId;
@@ -141,22 +141,22 @@ export default function Dashboard() {
     };
 
     const clearFilters = () => {
-        setActiveSeverities(new Set(ALL_SEVERITIES));
-        setActiveCategories(new Set(ALL_CATEGORIES));
+        setActiveSeverities(new Set());
+        setActiveCategories(new Set());
     };
 
     // ── useMemo MUST be here before early returns (Rules of Hooks) ────
     const issues = job?.result?.issues ?? [];
     const filteredIssues = useMemo(() => {
-        return issues.filter(issue =>
-            activeSeverities.has(issue.severity) &&
-            ALL_CATEGORIES.some(cat =>
-                issue.category.toLowerCase() === cat.toLowerCase() &&
-                activeCategories.has(cat)
-            )
-        );
+        return issues.filter(issue => {
+            const matchesSeverity = activeSeverities.size === 0 || activeSeverities.has(issue.severity);
+            const matchesCategory = activeCategories.size === 0 || ALL_CATEGORIES.some(cat => 
+                issue.category.toLowerCase() === cat.toLowerCase() && activeCategories.has(cat)
+            );
+            return matchesSeverity && matchesCategory;
+        });
     }, [issues, activeSeverities, activeCategories]);
-    const isFiltered = activeSeverities.size < ALL_SEVERITIES.length || activeCategories.size < ALL_CATEGORIES.length;
+    const isFiltered = activeSeverities.size > 0 || activeCategories.size > 0;
 
     // ── Loading / Error states ──────────────────────────────────────────────
     if (error) {
@@ -310,7 +310,7 @@ export default function Dashboard() {
                     {ALL_SEVERITIES.map(sev => (
                         <button
                             key={sev}
-                            className={`filter-btn ${activeSeverities.has(sev) ? 'active' : ''}`}
+                            className={`filter-pill ${activeSeverities.has(sev) ? 'active' : ''}`}
                             onClick={() => toggleSeverity(sev)}
                         >
                             {sev} <span className="filter-count">{severityCounts[sev]}</span>
@@ -324,7 +324,7 @@ export default function Dashboard() {
                     {ALL_CATEGORIES.map(cat => (
                         <button
                             key={cat}
-                            className={`filter-btn ${activeCategories.has(cat) ? 'active' : ''}`}
+                            className={`filter-pill ${activeCategories.has(cat) ? 'active' : ''}`}
                             onClick={() => toggleCategory(cat)}
                         >
                             {cat}

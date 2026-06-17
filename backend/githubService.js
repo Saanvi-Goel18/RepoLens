@@ -2,22 +2,30 @@ const { Octokit } = require("octokit");
 
 // Initialize Octokit with token from environment if available
 const authOpt = process.env.GITHUB_TOKEN ? { auth: process.env.GITHUB_TOKEN } : {};
-const octokit = new Octokit(authOpt);
+const globalOctokit = new Octokit(authOpt);
+
+function getOctokit(userToken) {
+    if (userToken) {
+        return new Octokit({ auth: userToken });
+    }
+    return globalOctokit;
+}
 
 /**
  * Fetches the complete file tree of a repository
  */
-async function fetchRepoTree(owner, repo) {
+async function fetchRepoTree(owner, repo, userToken = null) {
     try {
+        const client = getOctokit(userToken);
         // First get the default branch (usually main or master)
-        const { data: repoInfo } = await octokit.rest.repos.get({
+        const { data: repoInfo } = await client.rest.repos.get({
             owner,
             repo,
         });
         const defaultBranch = repoInfo.default_branch;
 
         // Get the tree recursively
-        const { data: treeData } = await octokit.rest.git.getTree({
+        const { data: treeData } = await client.rest.git.getTree({
             owner,
             repo,
             tree_sha: defaultBranch,
@@ -46,9 +54,10 @@ async function fetchRepoTree(owner, repo) {
 /**
  * Fetches the content of a specific file
  */
-async function fetchFileContent(owner, repo, path) {
+async function fetchFileContent(owner, repo, path, userToken = null) {
     try {
-        const { data } = await octokit.rest.repos.getContent({
+        const client = getOctokit(userToken);
+        const { data } = await client.rest.repos.getContent({
             owner,
             repo,
             path,

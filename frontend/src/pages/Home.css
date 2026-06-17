@@ -199,3 +199,91 @@
     color: var(--text-2);
     line-height: 1.5;
 }
+
+/* ── Roadmap (Future Features) ── */
+.roadmap-section {
+    width: 100%;
+    margin-top: 40px;
+    padding-top: 40px;
+    border-top: 1px solid var(--border);
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.4s 0.25s ease-out, transform 0.4s 0.25s ease-out;
+}
+.mounted .roadmap-section { opacity: 1; transform: translateY(0); }
+
+.roadmap-title {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-1);
+    margin-bottom: 32px;
+    line-height: 1.3;
+}
+
+.roadmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.roadmap-card {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    text-align: left;
+    border-radius: var(--radius-lg);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+}
+
+.roadmap-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--a1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.roadmap-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--text-3);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+}
+.roadmap-card:hover::before {
+    opacity: 1;
+}
+
+.roadmap-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--bg-raised);
+    color: var(--a1);
+    margin-bottom: 4px;
+    transition: transform 0.3s ease;
+}
+.roadmap-card:hover .roadmap-icon {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+.roadmap-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+}
+
+.roadmap-card p {
+    font-size: 14px;
+    color: var(--text-2);
+    line-height: 1.6;
+}

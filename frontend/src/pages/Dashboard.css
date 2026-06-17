@@ -267,32 +267,51 @@
     gap: 6px;
     margin-right: 4px;
 }
-.filter-btn {
-    background: var(--bg-void);
-    border: 1px solid var(--border);
-    color: var(--text-1);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
+.filter-pill {
+    background: transparent;
+    color: var(--text-2);
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
     display: flex;
     align-items: center;
     gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    user-select: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.filter-btn:hover { background: var(--bg-hover); }
-.filter-btn.active {
-    background: var(--bg-raised);
-    border-color: var(--text-2);
+.filter-pill:hover {
+    color: var(--text-1);
+    border-color: var(--text-3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
+.filter-pill.active {
+    background: var(--a1);
+    color: #ffffff;
+    border-color: var(--a1);
+    box-shadow: 0 4px 12px rgba(var(--a1-rgb), 0.2);
+}
+.filter-pill.active:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(var(--a1-rgb), 0.3);
+}
+
 .filter-count {
-    background: var(--border);
-    padding: 0 6px;
+    background: rgba(128, 128, 128, 0.15);
+    padding: 2px 6px;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
+    transition: background 0.2s, color 0.2s;
 }
+.filter-pill.active .filter-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
 .filter-divider {
     width: 1px;
     height: 16px;

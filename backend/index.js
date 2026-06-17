@@ -94,17 +94,50 @@ app.post('/analyze', analyzeLimiter, (req, res) => {
         repoUrl: repoUrl.trim(),
         owner: parsed.owner,
         repo: parsed.repo,
+        userToken: req.headers.authorization?.replace('Bearer ', '') || null,
         status: 'queued',
         result: null,
         error: null,
         createdAt: new Date().toISOString()
     });
 
-    processJob(jobId, parsed.owner, parsed.repo).catch(err => {
-        console.error(`Job ${jobId} failed:`, err);
-    });
+    // Start background processing
+    processJob(jobId).catch(err => console.error(`Job ${jobId} failed completely:`, err));
 
     res.status(202).json({ jobId, status: 'queued' });
+});
+
+// ─── OAuth Callback ───────────────────────────────────────────────────────────
+app.get('/auth/github/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.status(400).send('No code provided');
+
+    try {
+        const response = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                client_id: process.env.GITHUB_CLIENT_ID,
+                client_secret: process.env.GITHUB_CLIENT_SECRET,
+                code: code
+            })
+        });
+        
+        const data = await response.json();
+        if (data.error) {
+            return res.status(400).send(data.error_description);
+        }
+
+        // Redirect back to frontend with the token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}?token=${data.access_token}`);
+    } catch (err) {
+        console.error('OAuth Error:', err);
+        res.status(500).send('OAuth Error');
+    }
 });
 
 app.get('/result/:jobId', (req, res) => {
@@ -115,18 +148,22 @@ app.get('/result/:jobId', (req, res) => {
         return res.status(404).json({ error: 'Report not found. It may have expired (1 hour TTL) or never existed.' });
     }
 
-    res.json(job);
+    // Strip out the userToken from the result so we don't leak it
+    const safeJob = { ...job };
+    delete safeJob.userToken;
+
+    res.json(safeJob);
 });
 
 // ─── Analysis Pipeline ────────────────────────────────────────────────────────
-async function processJob(jobId, owner, repo) {
+async function processJob(jobId) {
     const job = jobs.get(jobId);
 
     const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
     try {
         await Promise.race([
-            runPipeline(job, owner, repo),
+            runPipeline(job),
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Analysis timed out after 3 minutes. The repository may be too large.')), TIMEOUT_MS)
             )
@@ -138,19 +175,19 @@ async function processJob(jobId, owner, repo) {
     }
 }
 
-async function runPipeline(job, owner, repo) {
+async function runPipeline(job) {
     const jobId = job.id;
 
     job.status = 'fetching';
 
     // 1. Fetch File Tree
-    const allFiles = await fetchRepoTree(owner, repo);
+    const allFiles = await fetchRepoTree(job.owner, job.repo, job.userToken);
 
     // 2. Prioritize and fetch contents
     // Groq free tier TPM limit is 12,000 tokens/min per request.
     // Budget: 7k file content + ~600 system prompt + ~200 user prefix + ~2k response = ~9.8k total.
     const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 7000, async (path) => {
-        return await fetchFileContent(owner, repo, path);
+        return await fetchFileContent(job.owner, job.repo, path, job.userToken);
     });
 
     console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
