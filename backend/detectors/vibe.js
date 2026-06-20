@@ -83,6 +83,54 @@ function detectVibeIssues(files) {
         }
     }
 
+    // ── Python Heuristics ──
+    for (const file of files) {
+        if (!file.path.endsWith('.py')) continue;
+        const lines = file.content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.match(/^\s*except\s*:\s*$/)) {
+                issues.push({
+                    category: "Code Quality",
+                    severity: "Warning",
+                    file: file.path,
+                    line: i + 1,
+                    description: "Bare except block detected.",
+                    fix: "Use 'except Exception as e:' to avoid catching SystemExit and KeyboardInterrupt."
+                });
+            }
+            if (line.match(/\b(eval|exec)\s*\(/)) {
+                issues.push({
+                    category: "Security",
+                    severity: "Critical",
+                    file: file.path,
+                    line: i + 1,
+                    description: "Usage of eval() or exec() detected.",
+                    fix: "Avoid using eval() or exec() as it can lead to arbitrary code execution. Use ast.literal_eval() if parsing data."
+                });
+            }
+        }
+    }
+
+    // ── Go Heuristics ──
+    for (const file of files) {
+        if (!file.path.endsWith('.go')) continue;
+        const lines = file.content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.match(/\bpanic\s*\(/)) {
+                issues.push({
+                    category: "Scalability",
+                    severity: "Warning",
+                    file: file.path,
+                    line: i + 1,
+                    description: "Usage of panic() detected in Go code.",
+                    fix: "Return standard Go error values instead of panicking, to prevent the entire service from crashing."
+                });
+            }
+        }
+    }
+
     return issues;
 }
 

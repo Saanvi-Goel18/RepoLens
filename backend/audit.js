@@ -5,26 +5,64 @@
 async function auditDependencies(files) {
     const issues = [];
     
-    const packageJsonFile = files.find(f => f.path === 'package.json' || f.path.endsWith('/package.json'));
-    if (!packageJsonFile) return issues;
+    let queries = [];
 
-    let dependencies = {};
-    try {
-        const pkg = JSON.parse(packageJsonFile.content);
-        dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
-    } catch (e) {
-        return issues;
+    // --- NPM (package.json) ---
+    const packageJsonFile = files.find(f => f.path === 'package.json' || f.path.endsWith('/package.json'));
+    if (packageJsonFile) {
+        try {
+            const pkg = JSON.parse(packageJsonFile.content);
+            const dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
+            Object.entries(dependencies).forEach(([pkgName, version]) => {
+                const cleanVersion = version.replace(/[\^~><= ]/g, '').split(/\s+/)[0].trim();
+                if (cleanVersion && cleanVersion !== '*' && cleanVersion !== 'latest') {
+                    queries.push({
+                        package: { name: pkgName, ecosystem: "npm" },
+                        version: cleanVersion,
+                        _file: packageJsonFile.path
+                    });
+                }
+            });
+        } catch (e) {
+            console.warn("Failed to parse package.json");
+        }
     }
 
-    const queries = Object.entries(dependencies).map(([pkgName, version]) => {
-        // Strip range operators, then take only the first segment.
-        // Handles ">=1.2.3 <2.0.0" → "1.2.3" correctly.
-        const cleanVersion = version.replace(/[\^~><= ]/g, '').split(/\s+/)[0].trim();
-        return {
-            package: { name: pkgName, ecosystem: "npm" },
-            version: cleanVersion
-        };
-    });
+    // --- Python (requirements.txt) ---
+    const reqFile = files.find(f => f.path === 'requirements.txt' || f.path.endsWith('/requirements.txt'));
+    if (reqFile) {
+        const lines = reqFile.content.split('\n');
+        lines.forEach(line => {
+            const match = line.match(/^([a-zA-Z0-9_\-]+)==([0-9\.]+)$/);
+            if (match) {
+                queries.push({
+                    package: { name: match[1], ecosystem: "PyPI" },
+                    version: match[2],
+                    _file: reqFile.path
+                });
+            }
+        });
+    }
+
+    // --- Go (go.mod) ---
+    const goModFile = files.find(f => f.path === 'go.mod' || f.path.endsWith('/go.mod'));
+    if (goModFile) {
+        const lines = goModFile.content.split('\n');
+        lines.forEach(line => {
+            // go.mod typically has: require github.com/foo/bar v1.2.3
+            // or inside a require block: github.com/foo/bar v1.2.3
+            const match = line.match(/^\s*(?:require\s+)?([a-zA-Z0-9_\-\.\/]+)\s+v([0-9\.]+.*)$/);
+            if (match) {
+                queries.push({
+                    package: { name: match[1], ecosystem: "Go" },
+                    version: match[2], // strip 'v'
+                    _file: goModFile.path
+                });
+            }
+        });
+    }
+
+
 
     if (queries.length === 0) return issues;
 
@@ -55,7 +93,7 @@ async function auditDependencies(files) {
                     issues.push({
                         category: "Security",
                         severity: "Critical",
-                        file: packageJsonFile.path,
+                        file: q._file || "package.json",
                         line: 1,
                         description: `Vulnerable dependency detected: ${q.package.name}@${q.version}. OSV ID: ${vuln.id}`,
                         fix: `Update ${q.package.name} to a secure version. Check OSV database for more details.`

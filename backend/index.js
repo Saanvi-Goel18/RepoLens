@@ -13,6 +13,8 @@ const { detectVibeIssues } = require('./detectors/vibe');
 const { auditDependencies } = require('./audit');
 const { analyzeWithLLM } = require('./llmService');
 const { computeFinalScores } = require('./scorer');
+const { saveScan, getRepoHistory } = require('./db');
+const { webhookMiddleware } = require('./webhookHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +24,10 @@ const PORT = process.env.PORT || 3001;
 // Defaults to localhost:5173 for local dev; set FRONTEND_URL in production.
 const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(cors({ origin: allowedOrigin }));
+
+// GitHub Webhooks need the raw body, so we use the middleware BEFORE express.json()
+app.use(webhookMiddleware);
+
 app.use(express.json());
 
 // Rate limiter: max 5 analysis requests per IP per 15 minutes
@@ -155,6 +161,17 @@ app.get('/result/:jobId', (req, res) => {
     res.json(safeJob);
 });
 
+app.get('/trends/:owner/:repo', (req, res) => {
+    const { owner, repo } = req.params;
+    try {
+        const history = getRepoHistory(owner, repo);
+        res.json(history);
+    } catch (err) {
+        console.error('Error fetching trends:', err);
+        res.status(500).json({ error: 'Failed to fetch trends' });
+    }
+});
+
 // ─── Analysis Pipeline ────────────────────────────────────────────────────────
 async function processJob(jobId) {
     const job = jobs.get(jobId);
@@ -214,6 +231,12 @@ async function runPipeline(job) {
     job.status = 'done';
     job.result = finalReport;
     job.completedAt = new Date().toISOString();
+    
+    try {
+        saveScan(jobId, job.owner, job.repo, finalReport.overallScore, finalReport.categoryScores);
+    } catch (err) {
+        console.error(`[${jobId}] Failed to save scan to history:`, err.message);
+    }
 
     console.log(`[${jobId}] Done. Overall score: ${finalReport.overallScore}`);
 }

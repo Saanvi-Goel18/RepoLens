@@ -6,13 +6,7 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        <header className="header">
-          <Link to="/" className="logo-group">
-            <div className="logo-icon">🔍</div>
-            <h1 className="logo-text">RepoLens</h1>
-          </Link>
-          <div className="header-subtitle">AI Code Reviewer</div>
-        </header>
+
 
         <main className="main-content">
           <Routes>

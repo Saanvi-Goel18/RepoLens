@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ShieldAlert, AlertTriangle, Info, ChevronDown, Activity, ArrowLeft, Copy, Check, ExternalLink, SlidersHorizontal, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import HistoryChart from '../components/HistoryChart';
 import './Dashboard.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -300,6 +301,11 @@ export default function Dashboard() {
                         </div>
                     ))}
                 </div>
+            </div>
+
+            {/* ── Historical Trend ── */}
+            <div className="animate-scale-in" style={{ animationDelay: '0.08s' }}>
+                <HistoryChart owner={job.owner} repo={job.repo} />
             </div>
 
             {/* ── Filters ── */}
