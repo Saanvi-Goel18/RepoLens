@@ -38,6 +38,8 @@ Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no
 ## ✨ Features
 
 - **Zero Setup** — Paste a GitHub URL. That's it.
+- **GitHub OAuth Integration** — Securely authenticate to scan private repositories with ease.
+- **Premium Deep Dark Aesthetic** — Vercel-inspired UI with sophisticated `Playfair Display` serif typography, smooth ScrollSpy navigation, and unified dark `#0a0a0a` surfaces.
 - **Async Job Queue** — Submits analysis as a background job (`202 Accepted`), polls for results. Handles large repos without timeouts.
 - **Hybrid Analysis Engine** — 4 static detectors + 1 LLM layer running concurrently.
 - **Weighted Score System** — Overall health score (0-100) computed across 5 rubric categories.
