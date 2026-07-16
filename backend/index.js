@@ -209,6 +209,9 @@ async function runPipeline(job) {
 
     console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
 
+    // Expose stats so the frontend can display "N files scanned"
+    job.stats = { filesAnalyzed: selectedFiles.length, totalTokens };
+
     job.status = 'analyzing';
 
     // 3. Static Analysis Layer (Run in parallel)

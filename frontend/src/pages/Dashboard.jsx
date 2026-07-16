@@ -175,22 +175,80 @@ export default function Dashboard() {
 
     if (!job || (job.status !== 'done' && job.status !== 'error')) {
         const statusMessages = {
-            queued:    { text: 'Queued for analysis...', sub: 'Starting up the pipeline.' },
-            fetching:  { text: 'Fetching repository...', sub: 'Pulling file tree and source files from GitHub.' },
-            analyzing: { text: 'Running analysis...', sub: 'Static detectors and LLM are working in parallel.' },
+            queued:    'Queued for analysis…',
+            fetching:  'Fetching repository…',
+            analyzing: 'Running analysis…',
         };
-        const msg = statusMessages[job?.status] || { text: 'Preparing...', sub: 'Hang tight.' };
+        const statusText = statusMessages[job?.status] || 'Preparing…';
+
         return (
-            <div className="dashboard-container centered animate-fade-in">
-                <div className="state-card glass-panel">
-                    <div className="spinner-ring" />
-                    <h2>{msg.text}</h2>
-                    <p>{msg.sub}</p>
-                    <p className="muted-hint">Usually takes 15–45 seconds depending on repo size.</p>
+            <div className="skeleton-layout animate-fade-in">
+
+                {/* Status label */}
+                <div className="skeleton-status-label">
+                    <span className="skeleton-status-dot" />
+                    {statusText}
                 </div>
+
+                {/* Header */}
+                <div className="skeleton-header">
+                    <div className="skeleton-header-left">
+                        <div className="skeleton" style={{ width: 280, height: 22 }} />
+                        <div className="skeleton" style={{ width: 200, height: 14 }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <div className="skeleton" style={{ width: 110, height: 34, borderRadius: 8 }} />
+                        <div className="skeleton" style={{ width: 100, height: 34, borderRadius: 8 }} />
+                    </div>
+                </div>
+
+                {/* Score grid */}
+                <div className="skeleton-scores">
+                    <div className="skeleton-overall">
+                        <div className="skeleton skeleton-circle" />
+                        <div className="skeleton" style={{ width: 100, height: 16 }} />
+                        <div className="skeleton" style={{ width: 130, height: 13 }} />
+                    </div>
+                    <div className="skeleton-bars-panel">
+                        {[100, 80, 120, 90, 110].map((w, i) => (
+                            <div className="skeleton-bar-item" key={i}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <div className="skeleton" style={{ width: w, height: 13 }} />
+                                    <div className="skeleton" style={{ width: 36, height: 13 }} />
+                                </div>
+                                <div className="skeleton" style={{ width: '100%', height: 8, borderRadius: 4 }} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="skeleton-filters">
+                    <div className="skeleton" style={{ width: 60, height: 13 }} />
+                    {[70, 80, 56, 90, 72, 110, 88].map((w, i) => (
+                        <div className="skeleton" key={i} style={{ width: w, height: 32, borderRadius: 20 }} />
+                    ))}
+                </div>
+
+                {/* Issue stubs */}
+                <div className="skeleton-issues">
+                    {[1, 2, 3, 4].map((_, i) => (
+                        <div className="skeleton-issue" key={i}>
+                            <div className="skeleton-issue-row">
+                                <div className="skeleton" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0 }} />
+                                <div className="skeleton" style={{ width: 60, height: 20, borderRadius: 20 }} />
+                                <div className="skeleton" style={{ width: 90, height: 20, borderRadius: 20 }} />
+                                <div className="skeleton" style={{ width: 140, height: 13, marginLeft: 4 }} />
+                            </div>
+                            <div className="skeleton" style={{ width: `${70 + i * 5}%`, height: 14 }} />
+                        </div>
+                    ))}
+                </div>
+
             </div>
         );
     }
+
 
     if (job.status === 'error') {
         return (

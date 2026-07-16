@@ -448,3 +448,128 @@
     color: var(--text-2);
     line-height: 1.6;
 }
+
+/* ── Skeleton / Shimmer Loading ── */
+@keyframes shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-raised) 25%,
+        var(--bg-hover, #1e1e1e) 50%,
+        var(--bg-raised) 75%
+    );
+    background-size: 600px 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-md);
+}
+
+/* Container for the skeleton layout — matches .dashboard-container */
+.skeleton-layout {
+    padding: 32px 24px 60px;
+    max-width: 1040px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Header row */
+.skeleton-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.skeleton-header-left { display: flex; flex-direction: column; gap: 8px; }
+
+/* Score grid */
+.skeleton-scores {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 16px;
+}
+@media (max-width: 800px) {
+    .skeleton-scores { grid-template-columns: 1fr; }
+}
+
+.skeleton-overall {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.skeleton-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+}
+.skeleton-bars-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+.skeleton-bar-item { display: flex; flex-direction: column; gap: 8px; }
+
+/* Filters bar */
+.skeleton-filters {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Issue stubs */
+.skeleton-issues { display: flex; flex-direction: column; gap: 12px; }
+.skeleton-issue {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.skeleton-issue-row { display: flex; align-items: center; gap: 10px; }
+
+/* Pulsing status label */
+.skeleton-status-label {
+    font-size: 13px;
+    color: var(--text-3);
+    text-align: center;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.skeleton-status-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--a1);
+    border-radius: 50%;
+    animation: pulse-dot 1.4s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+

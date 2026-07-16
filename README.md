@@ -17,10 +17,10 @@ Combines deterministic static analysis with contextual LLM review to produce a s
 </p>
 
 <p>
-  <a href="#-demo">View Demo</a> ·
   <a href="#-how-it-works">How It Works</a> ·
   <a href="#-getting-started">Getting Started</a> ·
-  <a href="#-architecture">Architecture</a>
+  <a href="#-api-reference">API Reference</a> ·
+  <a href="#-scoring-rubric">Scoring Rubric</a>
 </p>
 
 </div>
@@ -136,8 +136,8 @@ repolens/
 
 ### Prerequisites
 - Node.js v18+
-- A GitHub Personal Access Token ([generate here](https://github.com/settings/tokens)) — needed for higher API rate limits
-- An OpenAI API Key ([get one here](https://platform.openai.com/api-keys))
+- A **GitHub Personal Access Token** ([generate here](https://github.com/settings/tokens)) — gives you 5,000 API req/hr instead of 60
+- A **Groq API Key** (free at [console.groq.com](https://console.groq.com)) — used for LLM analysis
 
 ### 1. Clone the repository
 ```bash
@@ -151,10 +151,14 @@ cd backend
 npm install
 ```
 
-Create a `.env` file:
+Copy the example env file and fill in your values:
+```bash
+cp .env.example .env
+```
+
 ```env
 GITHUB_TOKEN=ghp_your_token_here
-OPENAI_API_KEY=sk-your_key_here
+GROQ_API_KEY=gsk_your_groq_key_here
 PORT=3001
 ```
 
@@ -163,15 +167,44 @@ Start the backend:
 npm run dev
 ```
 
-### 3. Start the frontend
+### 3. Configure the frontend
 ```bash
 cd ../frontend
 npm install
+```
+
+Copy the example env file:
+```bash
+cp .env.example .env.local
+```
+
+```env
+VITE_BACKEND_URL=http://localhost:3001
+```
+
+Start the frontend:
+```bash
 npm run dev
 ```
 
 ### 4. Open the app
 Navigate to **http://localhost:5173**, paste any public GitHub repo URL, and click **Analyze**.
+
+### 5. (Optional) Enable Private Repo Scanning via GitHub OAuth
+
+1. Go to [GitHub Developer Settings → OAuth Apps](https://github.com/settings/developers) and click **New OAuth App**.
+2. Set the **Authorization callback URL** to `http://localhost:3001/auth/github/callback`.
+3. Copy the **Client ID** and generate a **Client Secret**.
+4. Add them to your backend `.env`:
+   ```env
+   GITHUB_CLIENT_ID=your_client_id
+   GITHUB_CLIENT_SECRET=your_client_secret
+   ```
+5. Add the Client ID to your frontend `.env.local`:
+   ```env
+   VITE_GITHUB_CLIENT_ID=your_client_id
+   ```
+6. Restart both servers. The **Sign in with GitHub** button will now work.
 
 ---
 

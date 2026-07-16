@@ -521,7 +521,7 @@ export default function Home() {
             <footer id="documentation" className="w-full border-t border-outline-variant bg-surface flex flex-col md:flex-row justify-between items-center py-gutter px-margin-desktop gap-4">
                 <div className="font-label-caps text-label-caps text-primary">REPOLENS</div>
                 <div className="font-code-base text-code-base text-on-surface-variant text-center md:text-left">
-                    © 2024 REPOLENS TECHNICAL SYSTEMS [ 52.3676° N, 4.9041° E ]
+                    © {new Date().getFullYear()} REPOLENS TECHNICAL SYSTEMS [ 52.3676° N, 4.9041° E ]
                 </div>
                 <div className="flex gap-6">
                     <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="#">Status: Optimal</a>
