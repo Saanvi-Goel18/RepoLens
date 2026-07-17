@@ -10,7 +10,7 @@ Combines deterministic static analysis with contextual LLM review to produce a s
 <p>
   <img src="https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white" />
   <img src="https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react&logoColor=black" />
-  <img src="https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=flat-square&logo=openai&logoColor=white" />
+  <img src="https://img.shields.io/badge/Groq-Llama_3.3_70B-f55036?style=flat-square" />
   <img src="https://img.shields.io/badge/GitHub-Octokit-181717?style=flat-square&logo=github&logoColor=white" />
   <img src="https://img.shields.io/badge/OSV-Vulnerability%20DB-red?style=flat-square" />
   <img src="https://github.com/Saanvi-Goel18/RepoLens/actions/workflows/ci.yml/badge.svg" alt="CI" />
@@ -40,11 +40,10 @@ Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no
 - **Zero Setup** — Paste a GitHub URL. That's it.
 - **GitHub OAuth Integration** — Securely authenticate to scan private repositories with ease.
 - **Premium Deep Dark Aesthetic** — Vercel-inspired UI with sophisticated `Playfair Display` serif typography, smooth ScrollSpy navigation, and unified dark `#0a0a0a` surfaces.
-- **Async Job Queue** — Submits analysis as a background job (`202 Accepted`), polls for results. Handles large repos without timeouts.
+- **Background Processing** — Submits analysis as a background task (`202 Accepted`), polls for results.
 - **Hybrid Analysis Engine** — 4 static detectors + 1 LLM layer running concurrently.
 - **Weighted Score System** — Overall health score (0-100) computed across 5 rubric categories.
 - **Expandable Issue Reports** — Every issue comes with a file path, line number, severity, and a concrete fix suggestion.
-- **Production-safe Boot** — Backend starts cleanly even without API keys configured; errors surface at the job level, not the server level.
 
 ---
 
@@ -72,7 +71,7 @@ GitHub URL
     │  └─ OSV Dependency Audit — Batch queries the OSV vulnerability DB for all npm dependencies
     │
     ▼
-[4] LLM Analysis (GPT-4o-mini + Structured JSON Schema)
+[4] LLM Analysis (Groq Llama 3.3 70B + Structured JSON Schema)
     │  Receives file contents + static issues as context.
     │  Returns category scores and additional architectural issues
     │  via strict JSON schema enforcement (no hallucinated formats).
@@ -98,7 +97,7 @@ GitHub URL
 |---|---|---|
 | Backend Runtime | Node.js + Express | Non-blocking I/O for concurrent API calls |
 | GitHub Integration | Octokit (REST) | Official GitHub SDK, handles auth & rate limits |
-| Token Management | tiktoken | Exact token counting (not estimation) for GPT context budget |
+| Token Management | tiktoken | Exact token counting (not estimation) for LLM context budget |
 | LLM | Groq (llama-3.3-70b-versatile) | Free API, OpenAI-compatible, fast inference; `json_object` response format ensures structured output |
 | Vulnerability Data | OSV API (batch) | Free, open, authoritative vulnerability database — no API key needed |
 | Frontend | React + Vite | Fast HMR during development, optimized production builds |
