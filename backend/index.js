@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 
 // Import our core modules
 const { fetchRepoTree, fetchFileContent } = require('./githubService');
@@ -13,7 +15,7 @@ const { detectVibeIssues } = require('./detectors/vibe');
 const { auditDependencies } = require('./audit');
 const { analyzeWithLLM } = require('./llmService');
 const { computeFinalScores } = require('./scorer');
-const { saveScan, getRepoHistory } = require('./db');
+const { saveScan, getRepoHistory, getRecentScans } = require('./db');
 const { webhookMiddleware } = require('./webhookHandler');
 
 const app = express();
@@ -23,12 +25,13 @@ const PORT = process.env.PORT || 3001;
 // Restrict CORS to the configured frontend origin.
 // Defaults to localhost:5173 for local dev; set FRONTEND_URL in production.
 const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
-app.use(cors({ origin: allowedOrigin }));
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 
 // GitHub Webhooks need the raw body, so we use the middleware BEFORE express.json()
 app.use(webhookMiddleware);
 
 app.use(express.json());
+app.use(cookieParser());
 
 // Rate limiter: max 5 analysis requests per IP per 15 minutes
 const analyzeLimiter = rateLimit({
@@ -49,6 +52,18 @@ setInterval(() => {
     for (const [id, job] of jobs.entries()) {
         if (now - new Date(job.createdAt).getTime() > JOB_TTL_MS) {
             jobs.delete(id);
+        }
+    }
+}, 30 * 60 * 1000);
+
+// ─── OAuth State Store ────────────────────────────────────────────────────────
+const oauthStates = new Map();
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, stateObj] of oauthStates.entries()) {
+        if (now - stateObj.createdAt > 30 * 60 * 1000) {
+            oauthStates.delete(id);
         }
     }
 }, 30 * 60 * 1000);
@@ -74,12 +89,26 @@ function parseGitHubUrl(rawUrl) {
     return { owner: parts[0], repo: parts[1] };
 }
 
+// ─── Auth Middleware ──────────────────────────────────────────────────────────
+function authMiddleware(req, res, next) {
+    const token = req.cookies.auth_token;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.userToken = decoded.githubToken;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: 'Invalid or expired session' });
+    }
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', jobs: jobs.size });
 });
 
-app.post('/analyze', analyzeLimiter, (req, res) => {
+app.post('/analyze', analyzeLimiter, authMiddleware, (req, res) => {
     const { repoUrl } = req.body;
 
     if (!repoUrl) {
@@ -100,7 +129,7 @@ app.post('/analyze', analyzeLimiter, (req, res) => {
         repoUrl: repoUrl.trim(),
         owner: parsed.owner,
         repo: parsed.repo,
-        userToken: req.headers.authorization?.replace('Bearer ', '') || null,
+        userToken: req.userToken,
         status: 'queued',
         result: null,
         error: null,
@@ -113,10 +142,24 @@ app.post('/analyze', analyzeLimiter, (req, res) => {
     res.status(202).json({ jobId, status: 'queued' });
 });
 
-// ─── OAuth Callback ───────────────────────────────────────────────────────────
+// ─── OAuth Routes ─────────────────────────────────────────────────────────────
+app.get('/auth/github', (req, res) => {
+    const state = crypto.randomBytes(16).toString('hex');
+    oauthStates.set(state, { createdAt: Date.now() });
+    
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const redirectUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&state=${state}`;
+    res.redirect(redirectUrl);
+});
+
 app.get('/auth/github/callback', async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.status(400).send('No code provided');
+    const { code, state } = req.query;
+    if (!code || !state) return res.status(400).send('Missing code or state');
+
+    if (!oauthStates.has(state)) {
+        return res.status(403).send('Invalid or expired CSRF state');
+    }
+    oauthStates.delete(state);
 
     try {
         const response = await fetch('https://github.com/login/oauth/access_token', {
@@ -137,13 +180,42 @@ app.get('/auth/github/callback', async (req, res) => {
             return res.status(400).send(data.error_description);
         }
 
-        // Redirect back to frontend with the token
+        const tokenPayload = { githubToken: data.access_token };
+        const jwtToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        res.cookie('auth_token', jwtToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}?token=${data.access_token}`);
+        res.redirect(frontendUrl);
     } catch (err) {
         console.error('OAuth Error:', err);
         res.status(500).send('OAuth Error');
     }
+});
+
+app.get('/auth/status', (req, res) => {
+    const token = req.cookies.auth_token;
+    if (!token) return res.json({ isAuthenticated: false });
+    try {
+        jwt.verify(token, process.env.JWT_SECRET);
+        res.json({ isAuthenticated: true });
+    } catch {
+        res.json({ isAuthenticated: false });
+    }
+});
+
+app.post('/auth/logout', (req, res) => {
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax'
+    });
+    res.json({ success: true });
 });
 
 app.get('/result/:jobId', (req, res) => {
@@ -169,6 +241,20 @@ app.get('/trends/:owner/:repo', (req, res) => {
     } catch (err) {
         console.error('Error fetching trends:', err);
         res.status(500).json({ error: 'Failed to fetch trends' });
+    }
+});
+
+app.get('/recent-scans', (req, res) => {
+    try {
+        const scans = getRecentScans(10);
+        const anonymizedScans = scans.map(s => ({
+            repoId: crypto.createHash('sha256').update(`${s.owner}/${s.repo}`).digest('hex').substring(0, 7),
+            overall_score: s.overall_score
+        }));
+        res.json(anonymizedScans);
+    } catch (err) {
+        console.error('Error fetching recent scans:', err);
+        res.status(500).json({ error: 'Failed to fetch recent scans' });
     }
 });
 

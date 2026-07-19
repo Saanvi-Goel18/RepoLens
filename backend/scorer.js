@@ -3,14 +3,25 @@
  */
 
 function computeFinalScores(llmReport, staticIssues) {
-    // 1. Merge all issues
-    const allIssues = [...staticIssues, ...(llmReport.issues || [])];
+    function dedupeFindings(findings) {
+        const seen = new Set();
+        return findings.filter(f => {
+            const key = `${f.file}:${f.line}:${f.category}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    // 1. Dedupe static issues to avoid double-penalizing, then merge and dedupe with LLM
+    const dedupedStatic = dedupeFindings(staticIssues);
+    const allIssues = dedupeFindings([...dedupedStatic, ...(llmReport.issues || [])]);
 
     // 2. Start with LLM's baseline scores
     const scores = { ...llmReport.categoryScores };
 
     // 3. Apply penalties based on static issues
-    for (const issue of staticIssues) {
+    for (const issue of dedupedStatic) {
         let catKey = "";
         if (issue.category.includes("Security")) catKey = "security";
         else if (issue.category.includes("Scalability")) catKey = "scalability";
@@ -21,9 +32,9 @@ function computeFinalScores(llmReport, staticIssues) {
         if (catKey && scores[catKey] !== undefined) {
             let penalty = 0;
             if (catKey === "security") {
-                penalty = issue.severity === "Critical" ? 30 : 10;
+                penalty = issue.severity === "Critical" ? 30 : (issue.severity === "Warning" ? 10 : 2);
             } else {
-                penalty = issue.severity === "Critical" ? 20 : 5;
+                penalty = issue.severity === "Critical" ? 20 : (issue.severity === "Warning" ? 5 : 1);
             }
             
             scores[catKey] = Math.max(0, scores[catKey] - penalty);

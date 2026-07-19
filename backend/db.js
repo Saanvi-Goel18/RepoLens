@@ -49,8 +49,23 @@ function getRepoHistory(owner, repo) {
     }));
 }
 
+/**
+ * Get recent completed scans across all repos
+ */
+function getRecentScans(limit = 10) {
+    const stmt = db.prepare(`
+        SELECT owner, repo, overall_score, created_at 
+        FROM scans 
+        ORDER BY created_at DESC 
+        LIMIT ?
+    `);
+    
+    return stmt.all(limit);
+}
+
 module.exports = {
     db,
     saveScan,
-    getRepoHistory
+    getRepoHistory,
+    getRecentScans
 };

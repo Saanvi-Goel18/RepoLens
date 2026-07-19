@@ -15,33 +15,48 @@ try {
 function getFileWeight(path) {
     path = path.toLowerCase();
     
-    // Ignore common non-code directories/files
-    if (path.match(/(node_modules|\.git|dist|build|public|assets|images|\.png|\.jpg|\.svg|\.ico|\.pdf|\.md)/)) {
+    const segments = path.split('/');
+    const EXCLUDED_SEGMENTS = [
+        'examples', 'example', 'test', 'tests', '__tests__',
+        'docs', 'doc', '.github', 'demo', 'demos',
+        'node_modules', 'dist', 'build', 'coverage', 'public', 'assets', 'images'
+    ];
+    if (segments.some(seg => EXCLUDED_SEGMENTS.includes(seg))) {
         return 0;
     }
 
+    if (path.match(/(\.git|\.png|\.jpg|\.jpeg|\.svg|\.ico|\.pdf|\.md)$/)) {
+        return 0;
+    }
+
+    let baseWeight = 1;
+    const PRIORITY_SEGMENTS = ['src', 'lib', 'app', 'api'];
+    if (segments.some(seg => PRIORITY_SEGMENTS.includes(seg))) {
+        baseWeight += 2;
+    }
+
     // Entry points — match at root OR inside any subdirectory (e.g. src/index.js)
-    if (path.match(/(^|\/)((index|app|server|main)\.(js|ts))$/)) return 10;
+    if (path.match(/(^|\/)((index|app|server|main)\.(js|ts))$/)) return 10 + baseWeight;
     
     // Critical configs (ensure .env.example is always included)
-    if (path.match(/(^|\/)\.env(\.example)?$/)) return 10;
+    if (path.match(/(^|\/)\.env(\.example)?$/)) return 10 + baseWeight;
     
     // Auth, Middleware
-    if (path.match(/(auth|login|register|middleware)/)) return 9;
+    if (path.match(/(auth|login|register|middleware)/)) return 9 + baseWeight;
     
     // Models, DB Config
-    if (path.match(/(models?|schemas?|db|database|prisma|orm)/)) return 8;
+    if (path.match(/(models?|schemas?|db|database|prisma|orm)/)) return 8 + baseWeight;
     
     // Config files
-    if (path.match(/(config|env|setup|\.json|\.yml|\.yaml)/)) return 7;
+    if (path.match(/(config|env|setup|\.json|\.yml|\.yaml)/)) return 7 + baseWeight;
     
     // Routes, Controllers
-    if (path.match(/(routes?|controllers?|handlers?)/)) return 6;
+    if (path.match(/(routes?|controllers?|handlers?)/)) return 6 + baseWeight;
     
     // Default score for other source files
-    if (path.match(/\.(js|ts|jsx|tsx|py|go|java|rb|php)$/)) return 3;
+    if (path.match(/\.(js|ts|jsx|tsx|py|go|java|rb|php)$/)) return 3 + baseWeight;
     
-    return 1;
+    return baseWeight;
 }
 
 /**

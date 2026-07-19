@@ -110,20 +110,20 @@ function testPrioritizer() {
 
     console.log('\n── prioritizer.js ────────────────────────────');
 
-    assert('Entry point gets highest weight (10)', getFileWeight('index.js') === 10);
-    assert('server.ts is an entry point', getFileWeight('server.ts') === 10);
-    assert('Auth files get weight 9', getFileWeight('auth/login.js') === 9);
-    assert('Middleware gets weight 9', getFileWeight('middleware/rateLimit.js') === 9);
-    assert('Models get weight 8', getFileWeight('models/User.js') === 8);
-    assert('DB config gets weight 8', getFileWeight('database/config.js') === 8);
-    assert('Config JSON gets weight 7', getFileWeight('config.json') === 7);
-    assert('Routes get weight 6', getFileWeight('routes/users.js') === 6);
-    assert('Generic JS file gets weight 3', getFileWeight('utils/helper.js') === 3);
+    assert('Entry point gets highest weight (11)', getFileWeight('index.js') === 11);
+    assert('server.ts is an entry point', getFileWeight('server.ts') === 11);
+    assert('Auth files get weight 10', getFileWeight('auth/login.js') === 10);
+    assert('Middleware gets weight 10', getFileWeight('middleware/rateLimit.js') === 10);
+    assert('Models get weight 9', getFileWeight('models/User.js') === 9);
+    assert('DB config gets weight 9', getFileWeight('database/config.js') === 9);
+    assert('Config JSON gets weight 8', getFileWeight('config.json') === 8);
+    assert('Routes get weight 7', getFileWeight('routes/users.js') === 7);
+    assert('Generic JS file gets weight 4', getFileWeight('utils/helper.js') === 4);
     assert('node_modules gets weight 0', getFileWeight('node_modules/express/index.js') === 0);
     assert('.git folder gets weight 0', getFileWeight('.git/config') === 0);
     assert('Image files get weight 0', getFileWeight('assets/logo.png') === 0);
     assert('dist folder gets weight 0', getFileWeight('dist/bundle.js') === 0);
-    assert('Python files get weight 3', getFileWeight('app.py') === 3);
+    assert('Python files get weight 4', getFileWeight('app.py') === 4);
 
     return { passed, failed };
 }

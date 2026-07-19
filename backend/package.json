@@ -13,11 +13,13 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "better-sqlite3": "^12.11.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "eslint": "^8.57.1",
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
+    "jsonwebtoken": "^9.0.3",
     "octokit": "^3.2.1",
     "openai": "^6.39.0",
     "tiktoken": "^1.0.14"

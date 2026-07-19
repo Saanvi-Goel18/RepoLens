@@ -9,7 +9,7 @@ export default function Home() {
     const [repoUrl, setRepoUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('github_token') || null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [theme, setTheme] = useState('dark');
     const [scannerLogs, setScannerLogs] = useState([]);
@@ -27,16 +27,18 @@ export default function Home() {
     const revealSubtextRef = useRef(null);
     const ctaTextRef = useRef(null);
 
-    // OAuth callback handling
+    // Check authentication status
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlToken = urlParams.get('token');
-        if (urlToken) {
-            localStorage.setItem('github_token', urlToken);
-            setToken(urlToken);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            setIsModalOpen(true);
-        }
+        const checkStatus = async () => {
+            try {
+                const res = await fetch(`${BACKEND}/auth/status`, { credentials: 'include' });
+                const data = await res.json();
+                setIsAuthenticated(data.isAuthenticated);
+            } catch (err) {
+                setIsAuthenticated(false);
+            }
+        };
+        checkStatus();
     }, []);
 
     // Theme effect
@@ -80,56 +82,84 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        const codeLines = [
-            "fetching repository manifest...",
-            "indexing objects [88.2%]",
-            "CRITICAL: Found potential AWS_SECRET_ACCESS_KEY at src/config.ts:42",
-            "SCANNING dependencies: lodash v4.17.21 [VULNERABLE]",
-            "SCANNING dependencies: express v4.18.2 [SECURE]",
-            "Analyzing AST flow in /api/v1/auth...",
-            "SUCCESS: 124 units verified.",
-            "WARNING: Cyclomatic complexity high in /utils/parser.go",
-            "SCANNING: secret_detect_engine(v2.4)...",
-            "MATCH FOUND: Entropy signature 0xFA42 detected.",
-            "system_log: lens_capture_initiated...",
-            "analyzing_node_topology..."
-        ];
-
-        let currentLine = 0;
+        let isMounted = true;
         let timeoutId;
 
-        const addLog = () => {
-            const timeStr = new Date().toLocaleTimeString();
-            const rawText = codeLines[currentLine];
-            
-            // Format log based on text
-            let colorClass = "text-primary";
-            if (rawText.includes("CRITICAL") || rawText.includes("VULNERABLE")) colorClass = "text-error";
-            else if (rawText.includes("WARNING")) colorClass = "text-yellow-500";
-            else if (rawText.includes("SUCCESS")) colorClass = "text-green-400";
-            else if (rawText.includes("MATCH FOUND")) colorClass = "text-primary font-bold";
+        const initScanner = async () => {
+            let codeLines = [];
+            try {
+                const res = await fetch(`${BACKEND}/recent-scans`);
+                if (res.ok) {
+                    const scans = await res.json();
+                    if (scans.length > 0) {
+                        codeLines = scans.flatMap(s => {
+                            const lines = [
+                                `fetching repository manifest for repo-${s.repoId}...`,
+                                `indexing objects [100%]`,
+                                `running static analysis + dependency audit...`
+                            ];
+                            
+                            if (s.overall_score >= 85) lines.push(`SUCCESS: scan complete — Score: ${s.overall_score}/100`);
+                            else if (s.overall_score >= 65) lines.push(`system_log: scan complete — Score: ${s.overall_score}/100`);
+                            else if (s.overall_score >= 45) lines.push(`WARNING: scan complete — Score: ${s.overall_score}/100`);
+                            else lines.push(`CRITICAL: scan complete — Score: ${s.overall_score}/100`);
+                            
+                            return lines;
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to fetch recent scans for scanner animation", err);
+            }
 
-            const newLog = {
-                id: Date.now() + Math.random(),
-                time: timeStr,
-                text: rawText,
-                colorClass
+            if (codeLines.length === 0) {
+                codeLines = [
+                    "waiting for telemetry...",
+                    "system ready for analysis"
+                ];
+            }
+
+            if (!isMounted) return;
+
+            let currentLine = 0;
+            const addLog = () => {
+                if (!isMounted) return;
+                
+                const timeStr = new Date().toLocaleTimeString();
+                const rawText = codeLines[currentLine];
+                
+                // Format log based on text
+                let colorClass = "text-primary";
+                if (rawText.includes("CRITICAL")) colorClass = "text-error";
+                else if (rawText.includes("WARNING")) colorClass = "text-yellow-500";
+                else if (rawText.includes("SUCCESS")) colorClass = "text-green-400";
+                
+                const newLog = {
+                    id: Date.now() + Math.random(),
+                    time: timeStr,
+                    text: rawText,
+                    colorClass
+                };
+
+                setScannerLogs(prev => {
+                    const nextLogs = [...prev, newLog];
+                    if (nextLogs.length > 18) return nextLogs.slice(nextLogs.length - 18);
+                    return nextLogs;
+                });
+
+                currentLine = (currentLine + 1) % codeLines.length;
+                timeoutId = setTimeout(addLog, 1500 + Math.random() * 2000);
             };
 
-            setScannerLogs(prev => {
-                const nextLogs = [...prev, newLog];
-                if (nextLogs.length > 18) return nextLogs.slice(nextLogs.length - 18);
-                return nextLogs;
-            });
-
-            currentLine = (currentLine + 1) % codeLines.length;
-            timeoutId = setTimeout(addLog, 500 + Math.random() * 1000);
+            addLog();
         };
 
-        // Start initial logs
-        addLog();
+        initScanner();
 
-        return () => clearTimeout(timeoutId);
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     // Typewriter effect
@@ -173,17 +203,16 @@ export default function Home() {
     }, []);
 
     const handleLogin = () => {
-        const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
-        if (!clientId) {
-            setError('GitHub Client ID is not configured.');
-            return;
-        }
-        window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo`;
+        window.location.href = `${BACKEND}/auth/github`;
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('github_token');
-        setToken(null);
+    const handleLogout = async () => {
+        try {
+            await fetch(`${BACKEND}/auth/logout`, { method: 'POST', credentials: 'include' });
+        } catch (err) {
+            console.error('Logout failed', err);
+        }
+        setIsAuthenticated(false);
     };
 
     const validate = (url) => {
@@ -200,12 +229,10 @@ export default function Home() {
         setIsLoading(true);
         setError(null);
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const response = await fetch(`${BACKEND}/analyze`, {
                 method: 'POST',
-                headers,
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ repoUrl: repoUrl.trim() })
             });
             const data = await response.json();
@@ -234,7 +261,7 @@ export default function Home() {
                     </button>
                     <h2 className="font-headline-md text-primary mb-4">Start Analysis</h2>
                     
-                    {token ? (
+                    {isAuthenticated ? (
                         <div className="mb-6 p-3 border border-outline-variant rounded flex justify-between items-center">
                             <div className="flex items-center gap-2 text-primary text-sm font-label-caps">
                                 <span className="material-symbols-outlined text-[16px]">check_circle</span>
