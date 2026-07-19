@@ -24,8 +24,23 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ────────────────────────────────────────────────────────────────
 // Restrict CORS to the configured frontend origin.
 // Defaults to localhost:5173 for local dev; set FRONTEND_URL in production.
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
-app.use(cors({ origin: allowedOrigin, credentials: true }));
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:5173'
+].filter(Boolean);
+
+// Restrict CORS to the configured frontend origin(s).
+app.use(cors({ 
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }, 
+    credentials: true 
+}));
 
 // GitHub Webhooks need the raw body, so we use the middleware BEFORE express.json()
 app.use(webhookMiddleware);
@@ -233,10 +248,10 @@ app.get('/result/:jobId', (req, res) => {
     res.json(safeJob);
 });
 
-app.get('/trends/:owner/:repo', (req, res) => {
+app.get('/trends/:owner/:repo', async (req, res) => {
     const { owner, repo } = req.params;
     try {
-        const history = getRepoHistory(owner, repo);
+        const history = await getRepoHistory(owner, repo);
         res.json(history);
     } catch (err) {
         console.error('Error fetching trends:', err);
@@ -244,9 +259,9 @@ app.get('/trends/:owner/:repo', (req, res) => {
     }
 });
 
-app.get('/recent-scans', (req, res) => {
+app.get('/recent-scans', async (req, res) => {
     try {
-        const scans = getRecentScans(10);
+        const scans = await getRecentScans(10);
         const anonymizedScans = scans.map(s => ({
             repoId: crypto.createHash('sha256').update(`${s.owner}/${s.repo}`).digest('hex').substring(0, 7),
             overall_score: s.overall_score
@@ -322,7 +337,7 @@ async function runPipeline(job) {
     job.completedAt = new Date().toISOString();
     
     try {
-        saveScan(jobId, job.owner, job.repo, finalReport.overallScore, finalReport.categoryScores);
+        await saveScan(jobId, job.owner, job.repo, finalReport.overallScore, finalReport.categoryScores);
     } catch (err) {
         console.error(`[${jobId}] Failed to save scan to history:`, err.message);
     }

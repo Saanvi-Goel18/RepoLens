@@ -1,48 +1,57 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Pool } = require('pg');
 
-// Initialize database
-const dbPath = path.join(__dirname, 'database.sqlite');
-const db = new Database(dbPath);
+// Initialize database pool
+// This uses the DATABASE_URL environment variable automatically if passed to the constructor
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
 // Create table if not exists
-db.pragma('journal_mode = WAL'); // Faster performance
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS scans (
-    id TEXT PRIMARY KEY,
-    owner TEXT NOT NULL,
-    repo TEXT NOT NULL,
-    overall_score INTEGER NOT NULL,
-    category_scores TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+async function initDb() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scans (
+        id TEXT PRIMARY KEY,
+        owner TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        overall_score INTEGER NOT NULL,
+        category_scores TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (err) {
+    console.error('Failed to initialize database table:', err);
+  }
+}
+initDb();
 
 /**
  * Save a scan result
  */
-function saveScan(jobId, owner, repo, overallScore, categoryScores) {
-    const stmt = db.prepare(`
+async function saveScan(jobId, owner, repo, overallScore, categoryScores) {
+    const query = `
         INSERT INTO scans (id, owner, repo, overall_score, category_scores)
-        VALUES (?, ?, ?, ?, ?)
-    `);
+        VALUES ($1, $2, $3, $4, $5)
+    `;
     
-    stmt.run(jobId, owner, repo, overallScore, JSON.stringify(categoryScores));
+    await pool.query(query, [jobId, owner, repo, overallScore, JSON.stringify(categoryScores)]);
 }
 
 /**
  * Get historical scans for a repository, ordered by creation date
  */
-function getRepoHistory(owner, repo) {
-    const stmt = db.prepare(`
+async function getRepoHistory(owner, repo) {
+    const query = `
         SELECT id, overall_score, category_scores, created_at 
         FROM scans 
-        WHERE owner = ? AND repo = ? 
+        WHERE owner = $1 AND repo = $2 
         ORDER BY created_at ASC
-    `);
+    `;
     
-    const rows = stmt.all(owner, repo);
+    const { rows } = await pool.query(query, [owner, repo]);
     return rows.map(r => ({
         ...r,
         category_scores: JSON.parse(r.category_scores)
@@ -52,19 +61,20 @@ function getRepoHistory(owner, repo) {
 /**
  * Get recent completed scans across all repos
  */
-function getRecentScans(limit = 10) {
-    const stmt = db.prepare(`
+async function getRecentScans(limit = 10) {
+    const query = `
         SELECT owner, repo, overall_score, created_at 
         FROM scans 
         ORDER BY created_at DESC 
-        LIMIT ?
-    `);
+        LIMIT $1
+    `;
     
-    return stmt.all(limit);
+    const { rows } = await pool.query(query, [limit]);
+    return rows;
 }
 
 module.exports = {
-    db,
+    pool,
     saveScan,
     getRepoHistory,
     getRecentScans
