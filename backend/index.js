@@ -200,8 +200,8 @@ app.get('/auth/github/callback', async (req, res) => {
 
         res.cookie('auth_token', jwtToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Lax',
+            secure: true, // Required for cross-origin cookies
+            sameSite: 'none', // Required for cross-origin cookies between Vercel and Render
             maxAge: 24 * 60 * 60 * 1000
         });
 
