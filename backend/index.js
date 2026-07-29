@@ -7,7 +7,7 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 
 // Import our core modules
-const { fetchRepoTree, fetchFileContent } = require('./githubService');
+const { fetchRepoTree, fetchFileContent, checkRepoAccess } = require('./githubService');
 const { prioritizeFiles } = require('./prioritizer');
 const { runLinter } = require('./linter');
 const { detectSecrets } = require('./detectors/secrets');
@@ -15,7 +15,7 @@ const { detectVibeIssues } = require('./detectors/vibe');
 const { auditDependencies } = require('./audit');
 const { analyzeWithLLM } = require('./llmService');
 const { computeFinalScores } = require('./scorer');
-const { saveScan, getRepoHistory, getRecentScans } = require('./db');
+const { saveScan, getRepoHistory, getRecentScans, createJob, updateJob, getJob } = require('./db');
 const { webhookMiddleware } = require('./webhookHandler');
 
 const app = express();
@@ -54,7 +54,7 @@ const analyzeLimiter = rateLimit({
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Too many analysis requests. Please wait 15 minutes before trying again.' }
+    message: { error: 'Too many requests — you have reached the limit of 5 scans per 15 minutes. Please wait and try again.' }
 });
 
 // ─── Job Store ────────────────────────────────────────────────────────────────
@@ -105,6 +105,7 @@ function parseGitHubUrl(rawUrl) {
 }
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
+// Hard auth: used for routes that always require login.
 function authMiddleware(req, res, next) {
     const token = req.cookies.auth_token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
@@ -118,12 +119,29 @@ function authMiddleware(req, res, next) {
     }
 }
 
+// Soft auth: extracts the GitHub token from the JWT cookie if present and valid,
+// but never blocks the request. Used for endpoints that are public by default
+// but can leverage a user token if available (e.g. scanning private repos).
+function optionalAuth(req, res, next) {
+    req.userToken = null;
+    const token = req.cookies.auth_token;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.userToken = decoded.githubToken;
+        } catch {
+            // Expired/invalid cookie — treat as unauthenticated, don't block
+        }
+    }
+    next();
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', jobs: jobs.size });
 });
 
-app.post('/analyze', analyzeLimiter, authMiddleware, (req, res) => {
+app.post('/analyze', analyzeLimiter, optionalAuth, async (req, res) => {
     const { repoUrl } = req.body;
 
     if (!repoUrl) {
@@ -134,6 +152,41 @@ app.post('/analyze', analyzeLimiter, authMiddleware, (req, res) => {
     if (!parsed) {
         return res.status(400).json({
             error: 'Invalid URL. Please provide a valid public GitHub repository URL (e.g. https://github.com/owner/repo).'
+        });
+    }
+
+    // ── Visibility gate ────────────────────────────────────────────────────────
+    // Check repo accessibility *before* creating a job so we can give
+    // instant, synchronous feedback instead of a deferred job failure.
+    // checkRepoAccess uses an unauthenticated client when req.userToken is null,
+    // so a private repo correctly returns 404 to unauthenticated callers.
+    try {
+        const { isPrivate } = await checkRepoAccess(parsed.owner, parsed.repo, req.userToken);
+        if (isPrivate && !req.userToken) {
+            // Authenticated users can reach private repos they have access to;
+            // unauthenticated users never can.
+            return res.status(403).json({
+                error: 'This is a private repository. Please sign in with GitHub to scan it.',
+                code: 'PRIVATE_REPO'
+            });
+        }
+    } catch (err) {
+        if (err.status === 404) {
+            // GitHub returns 404 for both truly missing repos AND private repos
+            // that the caller has no access to. Since we have no token here
+            // we can't distinguish them — surface the privacy possibility.
+            const hint = req.userToken
+                ? 'Repository not found. Make sure the URL is correct and you have access.'
+                : 'Repository not found. If this is a private repository, please sign in with GitHub to scan it.';
+            return res.status(404).json({ error: hint, code: req.userToken ? 'NOT_FOUND' : 'PRIVATE_REPO' });
+        }
+        // Any other transient GitHub API error (rate limit on the check, network blip, etc.):
+        // fail closed — do not create a job. Private repos must not slip through
+        // just because GitHub's API hiccupped at the wrong moment.
+        console.warn(`[/analyze] checkRepoAccess failed for ${parsed.owner}/${parsed.repo}:`, err.message);
+        return res.status(503).json({
+            error: "Couldn't verify repository access right now — please try again in a moment.",
+            code: 'ACCESS_CHECK_FAILED'
         });
     }
 
@@ -150,6 +203,11 @@ app.post('/analyze', analyzeLimiter, authMiddleware, (req, res) => {
         error: null,
         createdAt: new Date().toISOString()
     });
+
+    // Persist initial row to DB (non-blocking — a DB hiccup must not
+    // block the 202 response or kill the in-flight job).
+    createJob(jobId, parsed.owner, parsed.repo, repoUrl.trim())
+        .catch(err => console.error(`[${jobId}] Failed to persist job to DB:`, err.message));
 
     // Start background processing
     processJob(jobId).catch(err => console.error(`Job ${jobId} failed completely:`, err));
@@ -201,7 +259,7 @@ app.get('/auth/github/callback', async (req, res) => {
         res.cookie('auth_token', jwtToken, {
             httpOnly: true,
             secure: true, // Required for cross-origin cookies
-            sameSite: 'none', // Required for cross-origin cookies between Vercel and Render
+            sameSite: 'None', // Required for cross-origin cookies between Vercel and Render
             maxAge: 24 * 60 * 60 * 1000
         });
 
@@ -227,21 +285,32 @@ app.get('/auth/status', (req, res) => {
 app.post('/auth/logout', (req, res) => {
     res.clearCookie('auth_token', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Lax'
+        secure: true,
+        sameSite: 'None'
     });
     res.json({ success: true });
 });
 
-app.get('/result/:jobId', (req, res) => {
+app.get('/result/:jobId', async (req, res) => {
     const { jobId } = req.params;
-    const job = jobs.get(jobId);
+    let job = jobs.get(jobId);
 
     if (!job) {
-        return res.status(404).json({ error: 'Report not found. It may have expired (1 hour TTL) or never existed.' });
+        // Not in memory — the server may have restarted since the job ran.
+        // Fall back to the DB, which holds the persisted result.
+        try {
+            job = await getJob(jobId);
+        } catch (err) {
+            console.error(`[${jobId}] DB fallback failed:`, err.message);
+        }
     }
 
-    // Strip out the userToken from the result so we don't leak it
+    if (!job) {
+        return res.status(404).json({ error: 'Report not found. It may have expired or never existed.' });
+    }
+
+    // Strip out the userToken from the result so we don't leak it.
+    // (userToken is never in the DB row, but may be on the in-memory object.)
     const safeJob = { ...job };
     delete safeJob.userToken;
 
@@ -290,6 +359,9 @@ async function processJob(jobId) {
         job.status = 'error';
         job.error = error.message;
         console.error(`[${jobId}] Error:`, error.message);
+        // Persist error state to DB so the result survives a restart.
+        updateJob(jobId, { status: 'error', error: error.message, completedAt: new Date().toISOString() })
+            .catch(err => console.error(`[${jobId}] Failed to update job error in DB:`, err.message));
     }
 }
 
@@ -340,6 +412,19 @@ async function runPipeline(job) {
         await saveScan(jobId, job.owner, job.repo, finalReport.overallScore, finalReport.categoryScores);
     } catch (err) {
         console.error(`[${jobId}] Failed to save scan to history:`, err.message);
+    }
+
+    // Persist full result to DB so the report survives a restart.
+    // stats is already populated on job by this point (set in step 2 above).
+    try {
+        await updateJob(jobId, {
+            status:      'done',
+            result:      finalReport,
+            stats:       job.stats,
+            completedAt: job.completedAt,
+        });
+    } catch (err) {
+        console.error(`[${jobId}] Failed to update job result in DB:`, err.message);
     }
 
     console.log(`[${jobId}] Done. Overall score: ${finalReport.overallScore}`);

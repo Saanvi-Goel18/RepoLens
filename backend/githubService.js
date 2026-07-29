@@ -73,7 +73,24 @@ async function fetchFileContent(owner, repo, path, userToken = null) {
     }
 }
 
+/**
+ * Checks whether a repository is accessible to a given user token.
+ * Deliberately uses an *unauthenticated* client when no userToken is passed
+ * (even if GITHUB_TOKEN is set on the server) so that the check accurately
+ * reflects what the requesting user can reach, not what the server can reach.
+ *
+ * Returns { isPrivate: boolean }.
+ * Throws with err.status === 404 if the repo is not found or inaccessible.
+ */
+async function checkRepoAccess(owner, repo, userToken = null) {
+    // Intentionally bypass globalOctokit/GITHUB_TOKEN for unauthenticated users
+    const client = userToken ? new Octokit({ auth: userToken }) : new Octokit({});
+    const { data } = await client.rest.repos.get({ owner, repo });
+    return { isPrivate: data.private };
+}
+
 module.exports = {
     fetchRepoTree,
-    fetchFileContent
+    fetchFileContent,
+    checkRepoAccess
 };

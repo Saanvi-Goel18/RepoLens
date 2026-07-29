@@ -237,7 +237,14 @@ export default function Home() {
             });
             const data = await response.json();
             if (response.status === 429) {
-                setError(data.error || 'Rate limit reached. Please wait a few minutes.');
+                setError(data.error || 'Too many requests — please wait a few minutes and try again.');
+            } else if (data.code === 'PRIVATE_REPO') {
+                // 403 or 404 from the visibility gate — backend couldn't reach the repo
+                // without a user token. The GitHub login button is right above this error.
+                setError('This looks like a private repository. Please sign in with GitHub above to scan it.');
+            } else if (data.code === 'ACCESS_CHECK_FAILED') {
+                // Transient GitHub API error during the visibility check — no job was created.
+                setError(data.error || "Couldn't verify repository access right now — please try again in a moment.");
             } else if (response.ok) {
                 navigate(`/r/${data.jobId}`);
             } else {
