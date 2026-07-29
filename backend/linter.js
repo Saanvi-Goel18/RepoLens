@@ -43,7 +43,8 @@ async function runLinter(files) {
                 for (const msg of result.messages) {
                     issues.push({
                         category: "Code Quality",
-                        severity: msg.severity === 2 ? "Warning" : "Info", // 2 is error in ESLint, but for our scale, we treat all as Warning/Info
+                        // ESLint severity: 2 = error, 1 = warning
+                        severity: msg.severity === 2 ? "Critical" : "Warning",
                         file: file.path,
                         line: msg.line,
                         description: `ESLint: ${msg.message} (${msg.ruleId || 'syntax error'})`,

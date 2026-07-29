@@ -406,12 +406,25 @@ export default function Dashboard() {
             {/* ── Issues List ── */}
             <div className="issues-list">
                 {filteredIssues.length === 0 ? (
-                    <div className="empty-state animate-fade-in" style={{ animationDelay: '0.15s' }}>
-                        <Check size={32} className="state-icon" style={{ color: 'var(--green)' }}/>
-                        <h3>No issues found</h3>
-                        <p>No issues match the current filter criteria.</p>
-                        {isFiltered && <button className="btn-primary" onClick={clearFilters}>Clear Filters</button>}
-                    </div>
+                    issues.length === 0 ? (
+                        // Genuinely zero issues — clean repo
+                        <div className="empty-state animate-fade-in" style={{ animationDelay: '0.15s' }}>
+                            <Check size={32} className="state-icon" style={{ color: 'var(--green)' }}/>
+                            <h3>This repo looks clean 🎉</h3>
+                            <p>No issues were detected by static analysis or the LLM review.</p>
+                        </div>
+                    ) : (
+                        // Issues exist but all are hidden by active filters
+                        <div className="empty-state animate-fade-in" style={{ animationDelay: '0.15s' }}>
+                            <Check size={32} className="state-icon" style={{ color: 'var(--green)' }}/>
+                            <h3>No issues match your filters</h3>
+                            <p>
+                                {issues.length} issue{issues.length !== 1 ? 's were' : ' was'} found in total,
+                                but none match the current filter selection.
+                            </p>
+                            <button className="btn-primary" onClick={clearFilters}>Clear Filters</button>
+                        </div>
+                    )
                 ) : (
                     filteredIssues.map((issue, index) => {
                         const isExpanded = expandedIssues.has(index);
