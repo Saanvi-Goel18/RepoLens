@@ -361,6 +361,36 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* ── Analysis Transparency ── */}
+            {job.stats && job.stats.universalChecksRun && (
+                <div className="glass-panel transparency-panel animate-scale-in" style={{ animationDelay: '0.06s', marginTop: '16px' }}>
+                    <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Activity size={18} /> Analysis Transparency
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+                        <div>
+                            <strong style={{ color: 'var(--text-main)' }}>Universal Checks ({job.stats.universalChecksRun.length}/{job.stats.universalChecksRun.length} ran)</strong>
+                            <p style={{ margin: '4px 0 0 0' }}>{job.stats.universalChecksRun.join(', ')}</p>
+                        </div>
+                        <div>
+                            <strong style={{ color: 'var(--text-main)' }}>Language-Specific Checks</strong>
+                            <p style={{ margin: '4px 0 0 0' }}>
+                                {job.stats.languageSpecificChecksRun?.length > 0 && 
+                                    <span style={{ color: 'var(--accent-color)' }}>
+                                        Ran: {job.stats.languageSpecificChecksRun.join(', ')}<br/>
+                                    </span>
+                                }
+                                {job.stats.languageSpecificChecksSkipped?.length > 0 && 
+                                    <span style={{ color: 'var(--text-dim)' }}>
+                                        Skipped: {job.stats.languageSpecificChecksSkipped.map(s => `${s.name} (${s.reason})`).join(', ')}
+                                    </span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Historical Trend ── */}
             <div className="animate-scale-in" style={{ animationDelay: '0.08s' }}>
                 <HistoryChart owner={job.owner} repo={job.repo} />

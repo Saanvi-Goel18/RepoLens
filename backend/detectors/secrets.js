@@ -80,6 +80,5 @@ function detectSecrets(files) {
     return issues;
 }
 
-module.exports = {
-    detectSecrets
-};
+const metadata = {"name":"Secrets","tier":"universal","languages":null,"func":"detectSecrets"};
+module.exports = { detectSecrets, metadata };

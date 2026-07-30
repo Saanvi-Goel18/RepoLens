@@ -60,6 +60,8 @@ async function runLinter(files) {
     return issues;
 }
 
+const metadata = { name: 'ESLint', tier: 'language-specific', languages: ['js', 'ts'] };
 module.exports = {
-    runLinter
+    runLinter,
+    metadata
 };

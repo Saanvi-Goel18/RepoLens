@@ -109,6 +109,8 @@ async function auditDependencies(files) {
     return issues;
 }
 
+const metadata = { name: 'Dependencies', tier: 'universal', languages: null };
 module.exports = {
-    auditDependencies
+    auditDependencies,
+    metadata
 };

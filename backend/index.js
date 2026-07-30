@@ -9,10 +9,16 @@ const jwt = require('jsonwebtoken');
 // Import our core modules
 const { fetchRepoTree, fetchFileContent, checkRepoAccess } = require('./githubService');
 const { prioritizeFiles } = require('./prioritizer');
-const { runLinter } = require('./linter');
-const { detectSecrets } = require('./detectors/secrets');
-const { detectVibeIssues } = require('./detectors/vibe');
-const { auditDependencies } = require('./audit');
+const { runLinter, metadata: linterMeta } = require('./linter');
+const { detectSecrets, metadata: secretsMeta } = require('./detectors/secrets');
+const { detectVibeIssues, metadata: vibeMeta } = require('./detectors/vibe');
+const { detectSQLInjection, metadata: sqlMeta } = require('./detectors/sqlInjection');
+const { detectBlockingIO, metadata: blockingIOMeta } = require('./detectors/blockingIO');
+const { detectDebugStatements, metadata: debugMeta } = require('./detectors/debugStatements');
+const { detectMissingErrorHandler, metadata: errorHandlerMeta } = require('./detectors/missingErrorHandler');
+const { detectOversizedFunctions, metadata: oversizedMeta } = require('./detectors/oversizedFunctions');
+const { detectCICD, metadata: cicdMeta } = require('./detectors/cicd');
+const { auditDependencies, metadata: auditMeta } = require('./audit');
 const { analyzeWithLLM } = require('./llmService');
 const { computeFinalScores } = require('./scorer');
 const { saveScan, getRepoHistory, getRecentScans, createJob, updateJob, getJob } = require('./db');
@@ -387,16 +393,69 @@ async function runPipeline(job) {
 
     job.status = 'analyzing';
 
-    // 3. Static Analysis Layer (Run in parallel)
-    const [linterIssues, secretIssues, vibeIssues, depIssues] = await Promise.all([
-        runLinter(selectedFiles),
-        detectSecrets(selectedFiles),
-        detectVibeIssues(selectedFiles),
-        auditDependencies(selectedFiles)
-    ]);
+    // 3. Static Analysis Layer (3-Tier Architecture)
+    const allDetectors = [
+        { run: runLinter, meta: linterMeta },
+        { run: detectSecrets, meta: secretsMeta },
+        { run: detectVibeIssues, meta: vibeMeta },
+        { run: detectSQLInjection, meta: sqlMeta },
+        { run: detectBlockingIO, meta: blockingIOMeta },
+        { run: detectDebugStatements, meta: debugMeta },
+        { run: detectMissingErrorHandler, meta: errorHandlerMeta },
+        { run: detectOversizedFunctions, meta: oversizedMeta },
+        { run: detectCICD, meta: cicdMeta },
+        { run: auditDependencies, meta: auditMeta }
+    ];
 
-    const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
+    // Detect repo languages from selected files
+    const repoLangs = new Set();
+    for (const file of selectedFiles) {
+        if (file.path.endsWith('.js')) repoLangs.add('js');
+        if (file.path.endsWith('.ts')) repoLangs.add('ts');
+        if (file.path.endsWith('.py')) repoLangs.add('py');
+        if (file.path.endsWith('.go')) repoLangs.add('go');
+    }
+
+    const universalChecksRun = [];
+    const languageSpecificChecksRun = [];
+    const languageSpecificChecksSkipped = [];
+    
+    const activeDetectors = [];
+    
+    for (const detector of allDetectors) {
+        if (detector.meta.tier === 'universal') {
+            universalChecksRun.push(detector.meta.name);
+            activeDetectors.push(detector);
+        } else if (detector.meta.tier === 'language-specific') {
+            const hasLang = detector.meta.languages.some(lang => repoLangs.has(lang));
+            if (hasLang) {
+                languageSpecificChecksRun.push(detector.meta.name);
+                activeDetectors.push(detector);
+            } else {
+                languageSpecificChecksSkipped.push({
+                    name: detector.meta.name,
+                    reason: `No ${detector.meta.languages.join('/')} detected`
+                });
+            }
+        }
+    }
+
+    const issueArrays = await Promise.all(
+        activeDetectors.map(d => Promise.resolve(d.run(selectedFiles)))
+    );
+
+    const staticIssues = issueArrays.flat();
     console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
+
+    // Update job.stats with transparency breakdown
+    job.stats = {
+        filesAnalyzed: selectedFiles.length,
+        totalTokens,
+        universalChecksRun,
+        languageSpecificChecksRun,
+        languageSpecificChecksSkipped,
+        llmReviewRan: true
+    };
 
     // 4. LLM Analysis Layer (Chunked)
     const CHUNK_SIZE = 6000;

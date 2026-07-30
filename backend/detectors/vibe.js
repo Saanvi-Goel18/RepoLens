@@ -134,6 +134,5 @@ function detectVibeIssues(files) {
     return issues;
 }
 
-module.exports = {
-    detectVibeIssues
-};
+const metadata = {"name":"Vibe Checks","tier":"language-specific","languages":["js","ts","py","go"],"func":"detectVibeIssues"};
+module.exports = { detectVibeIssues, metadata };
