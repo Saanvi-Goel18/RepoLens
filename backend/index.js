@@ -346,13 +346,13 @@ app.get('/recent-scans', async (req, res) => {
 async function processJob(jobId) {
     const job = jobs.get(jobId);
 
-    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+    const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
     try {
         await Promise.race([
             runPipeline(job),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Analysis timed out after 3 minutes. The repository may be too large.')), TIMEOUT_MS)
+                setTimeout(() => reject(new Error('Analysis timed out after 15 minutes. The repository may be too large.')), TIMEOUT_MS)
             )
         ]);
     } catch (error) {
@@ -375,8 +375,8 @@ async function runPipeline(job) {
 
     // 2. Prioritize and fetch contents
     // Groq free tier TPM limit is 12,000 tokens/min per request.
-    // Budget: 7k file content + ~600 system prompt + ~200 user prefix + ~2k response = ~9.8k total.
-    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 7000, async (path) => {
+    // Fetch a large budget (40k tokens) and we will chunk it for the LLM.
+    const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 40000, async (path) => {
         return await fetchFileContent(job.owner, job.repo, path, job.userToken);
     });
 
@@ -398,8 +398,78 @@ async function runPipeline(job) {
     const staticIssues = [...linterIssues, ...secretIssues, ...vibeIssues, ...depIssues];
     console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
 
-    // 4. LLM Analysis Layer
-    const llmReport = await analyzeWithLLM(selectedFiles, staticIssues);
+    // 4. LLM Analysis Layer (Chunked)
+    const CHUNK_SIZE = 6000;
+    const chunks = [];
+    let currentChunk = [];
+    let currentChunkTokens = 0;
+
+    for (const file of selectedFiles) {
+        if (currentChunkTokens + file.tokens > CHUNK_SIZE && currentChunk.length > 0) {
+            chunks.push(currentChunk);
+            currentChunk = [];
+            currentChunkTokens = 0;
+        }
+        currentChunk.push(file);
+        currentChunkTokens += file.tokens;
+    }
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+
+    console.log(`[${jobId}] Split files into ${chunks.length} chunks for LLM analysis`);
+
+    let mergedIssues = [];
+    let collectedScores = {
+        security: [], scalability: [], quality: [], production: [], maintainability: []
+    };
+    
+    job.stats.chunksAnalyzed = 0;
+    job.stats.totalChunks = chunks.length;
+    job.stats.partialAnalysis = false;
+    job.stats.skippedFiles = [];
+    job.stats.chunkDetails = chunks.map(c => c.map(f => f.path));
+    job.stats.chunkScores = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+        try {
+            console.log(`[${jobId}] Analyzing chunk ${i + 1} of ${chunks.length}...`);
+            const chunkReport = await analyzeWithLLM(chunks[i], i === 0 ? staticIssues : []); 
+            
+            mergedIssues = mergedIssues.concat(chunkReport.issues);
+            job.stats.chunkScores.push(chunkReport.categoryScores);
+            
+            for (const key of Object.keys(collectedScores)) {
+                if (chunkReport.categoryScores[key] !== null && chunkReport.categoryScores[key] !== undefined) {
+                    collectedScores[key].push(chunkReport.categoryScores[key]);
+                }
+            }
+            job.stats.chunksAnalyzed++;
+        } catch (err) {
+            console.error(`[${jobId}] Error analyzing chunk ${i + 1}:`, err.message);
+            job.stats.chunkScores.push(null);
+            job.stats.partialAnalysis = true;
+            job.stats.skippedFiles = job.stats.skippedFiles.concat(chunks[i].map(f => f.path));
+        }
+
+        if (i < chunks.length - 1) {
+            console.log(`[${jobId}] Delaying 60s for rate limit...`);
+            await new Promise(r => setTimeout(r, 60000));
+        }
+    }
+
+    // Merge strategy: Weakest link (minimum score) for each category
+    const mergedCategoryScores = {};
+    for (const key of Object.keys(collectedScores)) {
+        if (collectedScores[key].length > 0) {
+            mergedCategoryScores[key] = Math.min(...collectedScores[key]);
+        } else {
+            mergedCategoryScores[key] = 50; // Fallback if all chunks were null/failed
+        }
+    }
+
+    const llmReport = {
+        categoryScores: mergedCategoryScores,
+        issues: mergedIssues
+    };
 
     // 5. Score Merger
     const finalReport = computeFinalScores(llmReport, staticIssues);

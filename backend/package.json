@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node tests/unit.test.js && node tests/detectors.test.js"
+    "test": "node tests/unit.test.js && node tests/detectors.test.js && node tests/services.test.js"
   },
   "dependencies": {
     "@octokit/webhooks": "^14.2.0",
