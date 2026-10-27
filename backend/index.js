@@ -9,23 +9,17 @@ const jwt = require('jsonwebtoken');
 // Import our core modules
 const { fetchRepoTree, fetchFileContent, checkRepoAccess } = require('./githubService');
 const { prioritizeFiles } = require('./prioritizer');
-const { runLinter, metadata: linterMeta } = require('./linter');
-const { detectSecrets, metadata: secretsMeta } = require('./detectors/secrets');
-const { detectVibeIssues, metadata: vibeMeta } = require('./detectors/vibe');
-const { detectSQLInjection, metadata: sqlMeta } = require('./detectors/sqlInjection');
-const { detectBlockingIO, metadata: blockingIOMeta } = require('./detectors/blockingIO');
-const { detectDebugStatements, metadata: debugMeta } = require('./detectors/debugStatements');
-const { detectMissingErrorHandler, metadata: errorHandlerMeta } = require('./detectors/missingErrorHandler');
-const { detectOversizedFunctions, metadata: oversizedMeta } = require('./detectors/oversizedFunctions');
-const { detectCICD, metadata: cicdMeta } = require('./detectors/cicd');
-const { auditDependencies, metadata: auditMeta } = require('./audit');
-const { analyzeWithLLM } = require('./llmService');
+const { runStaticAnalysis, runChunkedLLMAnalysis } = require('./analysisPipeline');
 const { computeFinalScores } = require('./scorer');
 const { saveScan, getRepoHistory, getRecentScans, createJob, updateJob, getJob } = require('./db');
 const { webhookMiddleware } = require('./webhookHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Render/Vercel sit behind a reverse proxy — trust the first hop so req.ip is the
+// real client IP and the rate limiter doesn't bucket every user under the proxy's IP.
+app.set('trust proxy', 1);
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 // Restrict CORS to the configured frontend origin.
@@ -379,8 +373,17 @@ async function runPipeline(job) {
     // 1. Fetch File Tree
     const allFiles = await fetchRepoTree(job.owner, job.repo, job.userToken);
 
+    // Build a noise-filtered file tree for the UI's file explorer. This is the FULL repo
+    // (not just the token-budgeted subset the LLM sees), capped so a huge monorepo doesn't
+    // blow up the job payload.
+    const TREE_NOISE_SEGMENTS = new Set(['node_modules', 'dist', 'build', 'coverage', 'vendor', '.next', '.nuxt']);
+    const MAX_TREE_FILES = 2000;
+    const treeCandidates = allFiles.filter(f => !f.path.split('/').some(seg => TREE_NOISE_SEGMENTS.has(seg)));
+    const fileTree = treeCandidates.slice(0, MAX_TREE_FILES).map(f => ({ path: f.path, size: f.size }));
+    const fileTreeTruncated = treeCandidates.length > MAX_TREE_FILES;
+
     // 2. Prioritize and fetch contents
-    // Groq free tier TPM limit is 12,000 tokens/min per request.
+    // openai/gpt-oss-120b free tier TPM limit is 8,000 tokens/min per request.
     // Fetch a large budget (40k tokens) and we will chunk it for the LLM.
     const { selectedFiles, totalTokens } = await prioritizeFiles(allFiles, 40000, async (path) => {
         return await fetchFileContent(job.owner, job.repo, path, job.userToken);
@@ -389,146 +392,49 @@ async function runPipeline(job) {
     console.log(`[${jobId}] Fetched ${selectedFiles.length} files (${totalTokens} tokens)`);
 
     // Expose stats so the frontend can display "N files scanned"
-    job.stats = { filesAnalyzed: selectedFiles.length, totalTokens };
+    job.stats = { filesAnalyzed: selectedFiles.length, totalTokens, fileTree, fileTreeTruncated };
 
     job.status = 'analyzing';
 
-    // 3. Static Analysis Layer (3-Tier Architecture)
-    const allDetectors = [
-        { run: runLinter, meta: linterMeta },
-        { run: detectSecrets, meta: secretsMeta },
-        { run: detectVibeIssues, meta: vibeMeta },
-        { run: detectSQLInjection, meta: sqlMeta },
-        { run: detectBlockingIO, meta: blockingIOMeta },
-        { run: detectDebugStatements, meta: debugMeta },
-        { run: detectMissingErrorHandler, meta: errorHandlerMeta },
-        { run: detectOversizedFunctions, meta: oversizedMeta },
-        { run: detectCICD, meta: cicdMeta },
-        { run: auditDependencies, meta: auditMeta }
-    ];
+    // 3. Static Analysis Layer (3-Tier Architecture) — shared with the PR webhook
+    // pipeline (see analysisPipeline.js) so the two entry points can't drift apart.
+    const {
+        staticIssues,
+        universalChecksRun,
+        languageSpecificChecksRun,
+        languageSpecificChecksSkipped
+    } = await runStaticAnalysis(selectedFiles);
 
-    // Detect repo languages from selected files
-    const repoLangs = new Set();
-    for (const file of selectedFiles) {
-        if (file.path.endsWith('.js')) repoLangs.add('js');
-        if (file.path.endsWith('.ts')) repoLangs.add('ts');
-        if (file.path.endsWith('.py')) repoLangs.add('py');
-        if (file.path.endsWith('.go')) repoLangs.add('go');
-    }
-
-    const universalChecksRun = [];
-    const languageSpecificChecksRun = [];
-    const languageSpecificChecksSkipped = [];
-    
-    const activeDetectors = [];
-    
-    for (const detector of allDetectors) {
-        if (detector.meta.tier === 'universal') {
-            universalChecksRun.push(detector.meta.name);
-            activeDetectors.push(detector);
-        } else if (detector.meta.tier === 'language-specific') {
-            const hasLang = detector.meta.languages.some(lang => repoLangs.has(lang));
-            if (hasLang) {
-                languageSpecificChecksRun.push(detector.meta.name);
-                activeDetectors.push(detector);
-            } else {
-                languageSpecificChecksSkipped.push({
-                    name: detector.meta.name,
-                    reason: `No ${detector.meta.languages.join('/')} detected`
-                });
-            }
-        }
-    }
-
-    const issueArrays = await Promise.all(
-        activeDetectors.map(d => Promise.resolve(d.run(selectedFiles)))
-    );
-
-    const staticIssues = issueArrays.flat();
     console.log(`[${jobId}] Static analysis found ${staticIssues.length} issues`);
 
     // Update job.stats with transparency breakdown
     job.stats = {
         filesAnalyzed: selectedFiles.length,
         totalTokens,
+        fileTree,
+        fileTreeTruncated,
         universalChecksRun,
         languageSpecificChecksRun,
         languageSpecificChecksSkipped,
         llmReviewRan: true
     };
 
-    // 4. LLM Analysis Layer (Chunked)
-    const CHUNK_SIZE = 6000;
-    const chunks = [];
-    let currentChunk = [];
-    let currentChunkTokens = 0;
+    // 4. LLM Analysis Layer (Chunked) — shared pipeline (see analysisPipeline.js).
+    // openai/gpt-oss-120b free tier is 8K TPM (input+output combined per request), tighter
+    // than the old llama-3.3-70b-versatile budget — leave headroom for the repo map,
+    // static-issue summary, and completion tokens added to every chunk. No blind
+    // fixed-length sleep between chunks — analyzeWithLLM already backs off using the
+    // server's real retry-after window when it actually hits the rate limit.
+    const llmReport = await runChunkedLLMAnalysis(selectedFiles, staticIssues, { chunkSize: 4500 });
 
-    for (const file of selectedFiles) {
-        if (currentChunkTokens + file.tokens > CHUNK_SIZE && currentChunk.length > 0) {
-            chunks.push(currentChunk);
-            currentChunk = [];
-            currentChunkTokens = 0;
-        }
-        currentChunk.push(file);
-        currentChunkTokens += file.tokens;
-    }
-    if (currentChunk.length > 0) chunks.push(currentChunk);
+    console.log(`[${jobId}] Split files into ${llmReport.totalChunks} chunks for LLM analysis`);
 
-    console.log(`[${jobId}] Split files into ${chunks.length} chunks for LLM analysis`);
-
-    let mergedIssues = [];
-    let collectedScores = {
-        security: [], scalability: [], quality: [], production: [], maintainability: []
-    };
-    
-    job.stats.chunksAnalyzed = 0;
-    job.stats.totalChunks = chunks.length;
-    job.stats.partialAnalysis = false;
-    job.stats.skippedFiles = [];
-    job.stats.chunkDetails = chunks.map(c => c.map(f => f.path));
-    job.stats.chunkScores = [];
-
-    for (let i = 0; i < chunks.length; i++) {
-        try {
-            console.log(`[${jobId}] Analyzing chunk ${i + 1} of ${chunks.length}...`);
-            const chunkReport = await analyzeWithLLM(chunks[i], i === 0 ? staticIssues : []); 
-            
-            mergedIssues = mergedIssues.concat(chunkReport.issues);
-            job.stats.chunkScores.push(chunkReport.categoryScores);
-            
-            for (const key of Object.keys(collectedScores)) {
-                if (chunkReport.categoryScores[key] !== null && chunkReport.categoryScores[key] !== undefined) {
-                    collectedScores[key].push(chunkReport.categoryScores[key]);
-                }
-            }
-            job.stats.chunksAnalyzed++;
-        } catch (err) {
-            console.error(`[${jobId}] Error analyzing chunk ${i + 1}:`, err.message);
-            job.stats.chunkScores.push(null);
-            job.stats.partialAnalysis = true;
-            job.stats.skippedFiles = job.stats.skippedFiles.concat(chunks[i].map(f => f.path));
-        }
-
-        if (i < chunks.length - 1) {
-            console.log(`[${jobId}] Delaying 60s for rate limit...`);
-            await new Promise(r => setTimeout(r, 60000));
-        }
-    }
-
-    // Merge strategy: Weakest link (minimum score) for each category
-    const mergedCategoryScores = {};
-    for (const key of Object.keys(collectedScores)) {
-        if (collectedScores[key].length > 0) {
-            mergedCategoryScores[key] = Math.min(...collectedScores[key]);
-        } else {
-            mergedCategoryScores[key] = 50; // Fallback if all chunks were null/failed
-        }
-    }
-
-    const llmReport = {
-        categoryScores: mergedCategoryScores,
-        issues: mergedIssues
-    };
+    job.stats.chunksAnalyzed = llmReport.chunksAnalyzed;
+    job.stats.totalChunks = llmReport.totalChunks;
+    job.stats.partialAnalysis = llmReport.partialAnalysis;
+    job.stats.skippedFiles = llmReport.skippedFiles;
+    job.stats.chunkDetails = llmReport.chunkDetails;
+    job.stats.chunkScores = llmReport.chunkScores;
 
     // 5. Score Merger
     const finalReport = computeFinalScores(llmReport, staticIssues);

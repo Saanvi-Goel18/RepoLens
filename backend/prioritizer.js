@@ -17,7 +17,7 @@ function getFileWeight(path) {
     
     const segments = path.split('/');
     const EXCLUDED_SEGMENTS = [
-        'examples', 'example', 'test', 'tests', '__tests__',
+        '.git', 'examples', 'example', 'test', 'tests', '__tests__',
         'docs', 'doc', '.github', 'demo', 'demos',
         'node_modules', 'dist', 'build', 'coverage', 'public', 'assets', 'images'
     ];

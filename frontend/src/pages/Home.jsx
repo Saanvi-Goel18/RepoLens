@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../ThemeContext';
 import './Home.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -11,20 +12,13 @@ export default function Home() {
     const [error, setError] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [theme, setTheme] = useState('dark');
+    const { theme, toggleTheme } = useTheme();
     const [scannerLogs, setScannerLogs] = useState([]);
     const [isScrolled, setIsScrolled] = useState(false);
     const [activeSection, setActiveSection] = useState('dashboard');
     const navigate = useNavigate();
     
     // Refs for scroll and animation logic
-    const headerRef = useRef(null);
-    const viewportRef = useRef(null);
-    const heroLeftRef = useRef(null);
-    const heroRightRef = useRef(null);
-    const ctaGroupRef = useRef(null);
-    const revealTaglineRef = useRef(null);
-    const revealSubtextRef = useRef(null);
     const ctaTextRef = useRef(null);
 
     // Check authentication status
@@ -34,17 +28,12 @@ export default function Home() {
                 const res = await fetch(`${BACKEND}/auth/status`, { credentials: 'include' });
                 const data = await res.json();
                 setIsAuthenticated(data.isAuthenticated);
-            } catch (err) {
+            } catch {
                 setIsAuthenticated(false);
             }
         };
         checkStatus();
     }, []);
-
-    // Theme effect
-    useEffect(() => {
-        document.body.className = `${theme} font-body-base antialiased`;
-    }, [theme]);
 
     // Scroll effect for header
     useEffect(() => {
@@ -317,32 +306,33 @@ export default function Home() {
                     </form>
                 </div>
             </div>
-            {/* Orion-Style Top Navigation Bar (with scroll theme toggle) */}
-            <nav className={`w-full z-[100] backdrop-blur-md border-b flex justify-between items-center h-14 px-margin-desktop sticky top-0 transition-colors duration-300 ${isScrolled ? 'bg-white/90 text-black border-gray-300' : 'bg-background/80 text-primary border-outline-variant'}`} id="main-nav">
+            {/* Top Navigation Bar */}
+            <nav className={`w-full z-[100] backdrop-blur-md border-b border-outline-variant flex justify-between items-center h-14 px-margin-desktop sticky top-0 transition-colors duration-300 text-primary ${isScrolled ? 'bg-background/95' : 'bg-background/80'}`} id="main-nav">
                 {/* Logo */}
-                <div className={`font-headline-md text-headline-md tracking-tighter ${isScrolled ? 'text-black' : 'text-primary'}`} id="nav-logo">
+                <div className="font-headline-md text-headline-md tracking-tighter text-primary" id="nav-logo">
                     RepoLens
                 </div>
-                
+
                 {/* Center Links */}
                 <div className="hidden md:flex gap-10 items-center">
-                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'dashboard' ? (isScrolled ? 'border-b border-black text-black' : 'border-b border-primary text-primary') : (isScrolled ? 'text-gray-500 hover:text-black' : 'text-on-surface-variant hover:text-primary')}`} href="#dashboard">Dashboard</a>
-                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'inventory' ? (isScrolled ? 'border-b border-black text-black' : 'border-b border-primary text-primary') : (isScrolled ? 'text-gray-500 hover:text-black' : 'text-on-surface-variant hover:text-primary')}`} href="#inventory">Inventory</a>
-                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'activity' ? (isScrolled ? 'border-b border-black text-black' : 'border-b border-primary text-primary') : (isScrolled ? 'text-gray-500 hover:text-black' : 'text-on-surface-variant hover:text-primary')}`} href="#activity">Activity</a>
-                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'documentation' ? (isScrolled ? 'border-b border-black text-black' : 'border-b border-primary text-primary') : (isScrolled ? 'text-gray-500 hover:text-black' : 'text-on-surface-variant hover:text-primary')}`} href="#documentation">Documentation</a>
+                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'dashboard' ? 'border-b border-primary text-primary' : 'text-on-surface-variant hover:text-primary'}`} href="#dashboard">Overview</a>
+                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'inventory' ? 'border-b border-primary text-primary' : 'text-on-surface-variant hover:text-primary'}`} href="#inventory">Features</a>
+                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'activity' ? 'border-b border-primary text-primary' : 'text-on-surface-variant hover:text-primary'}`} href="#activity">Scan</a>
+                    <a className={`font-label-caps text-label-caps transition-colors pb-1 ${activeSection === 'documentation' ? 'border-b border-primary text-primary' : 'text-on-surface-variant hover:text-primary'}`} href="#documentation">About</a>
                 </div>
 
                 {/* Right Side */}
                 <div className="flex items-center gap-6">
-                    <button 
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className={`transition-colors flex items-center justify-center ${isScrolled ? 'text-black hover:opacity-80' : 'text-primary hover:opacity-80'}`}
+                    <button
+                        onClick={toggleTheme}
+                        className="text-primary hover:opacity-80 transition-colors flex items-center justify-center"
+                        aria-label="Toggle theme"
                     >
                         <span className="material-symbols-outlined text-[20px]">
                             {theme === 'dark' ? 'dark_mode' : 'light_mode'}
                         </span>
                     </button>
-                    <span className={`material-symbols-outlined cursor-pointer transition-colors ${isScrolled ? 'text-black hover:opacity-80' : 'text-primary hover:opacity-80'}`} onClick={() => setIsModalOpen(true)}>account_circle</span>
+                    <span className="material-symbols-outlined cursor-pointer text-primary hover:opacity-80 transition-colors" onClick={() => setIsModalOpen(true)}>account_circle</span>
                 </div>
             </nav>
 
@@ -365,7 +355,7 @@ export default function Home() {
                             </div>
                             <div className="mt-12 flex flex-col sm:flex-row gap-4">
                                 <button onClick={() => setIsModalOpen(true)} className="bg-primary text-background font-label-caps text-label-caps px-8 py-4 hover:opacity-90 transition-opacity">START SCAN</button>
-                                <a href="#documentation" className="bg-transparent text-primary font-label-caps text-label-caps px-8 py-4 border border-outline-variant hover:border-primary transition-colors inline-block text-center">VIEW DOCS</a>
+                                <a href="#inventory" className="bg-transparent text-primary font-label-caps text-label-caps px-8 py-4 border border-outline-variant hover:border-primary transition-colors inline-block text-center">HOW IT WORKS</a>
                             </div>
                         </div>
 
@@ -403,7 +393,7 @@ export default function Home() {
                                 <span className="material-symbols-outlined text-[14px]">hub</span> GITHUB NATIVE
                             </span>
                             <span className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[14px]">architecture</span> DETERMINISTIC AST
+                                <span className="material-symbols-outlined text-[14px]">architecture</span> OSV DEPENDENCY AUDIT
                             </span>
                         </div>
                         <div aria-hidden="true" className="marquee-content">
@@ -420,7 +410,7 @@ export default function Home() {
                                 <span className="material-symbols-outlined text-[14px]">hub</span> GITHUB NATIVE
                             </span>
                             <span className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[14px]">architecture</span> DETERMINISTIC AST
+                                <span className="material-symbols-outlined text-[14px]">architecture</span> OSV DEPENDENCY AUDIT
                             </span>
                         </div>
                     </div>
@@ -442,13 +432,13 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <h3 className="font-headline-md text-[20px] mb-4">Hybrid Analysis</h3>
-                                    <p className="font-body-base text-body-base text-on-surface-variant">Deterministic AST parsing combined with semantic intelligence to find what ESLint misses.</p>
+                                    <p className="font-body-base text-body-base text-on-surface-variant">Deterministic static detectors (ESLint, secrets, SQL injection, OSV) plus a chunked LLM review that catches what rules miss.</p>
                                 </div>
                                 <div className="card-drawer pt-4 border-t border-outline-variant/30">
                                     <div className="text-[10px] text-surface-tint leading-relaxed space-y-1">
-                                        <div className="flex items-center gap-2"><span className="text-primary">✓</span> AST detected: Circular dependency</div>
-                                        <div className="flex items-center gap-2"><span className="text-secondary-fixed">i</span> AI Insight: Refactor suggest - use Composition pattern</div>
-                                        <div className="opacity-40 italic">Scanning src/components/Auth... Done in 14ms</div>
+                                        <div className="flex items-center gap-2"><span className="text-primary">✓</span> ESLint: 'token' is defined but never used</div>
+                                        <div className="flex items-center gap-2"><span className="text-secondary-fixed">i</span> LLM: route has no auth middleware</div>
+                                        <div className="opacity-40 italic">Static findings are passed to the LLM as context</div>
                                         <div className="w-full bg-surface-container-high h-1 mt-2">
                                             <div className="bg-primary h-full w-[85%] transition-all duration-1000"></div>
                                         </div>
@@ -475,13 +465,13 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <h3 className="font-headline-md text-[20px] mb-4">Security Auditing</h3>
-                                    <p className="font-body-base text-body-base text-on-surface-variant">Real-time OSV scanning and secret detection before you ever hit merge.</p>
+                                    <p className="font-body-base text-body-base text-on-surface-variant">OSV vulnerability lookups for npm, PyPI and Go dependencies, plus hardcoded-secret and SQL-injection checks.</p>
                                 </div>
                                 <div className="card-drawer pt-4 border-t border-outline-variant/30">
                                     <div className="text-[10px] text-error leading-relaxed space-y-1">
-                                        <div>CRITICAL: CVE-2024-21503 in @nestjs/core</div>
-                                        <div>HIGH: Unvalidated Redirect in auth.ts:102</div>
-                                        <div className="text-on-surface-variant opacity-60">Database connections: ENCRYPTED</div>
+                                        <div>CRITICAL: Vulnerable dependency (OSV) in package.json</div>
+                                        <div>CRITICAL: Potential hardcoded secret in config.js:12</div>
+                                        <div className="text-on-surface-variant opacity-60">WARNING: DB call without try/catch</div>
                                     </div>
                                 </div>
                             </div>
@@ -505,13 +495,13 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <h3 className="font-headline-md text-[20px] mb-4">Deep Insights</h3>
-                                    <p className="font-body-base text-body-base text-on-surface-variant">0-100 health scores mapped across every module in your codebase with trend analysis.</p>
+                                    <p className="font-body-base text-body-base text-on-surface-variant">A 0-100 health score across 5 weighted categories, with a trend chart when you rescan a repo.</p>
                                 </div>
                                 <div className="card-drawer pt-4 border-t border-outline-variant/30">
                                     <div className="grid grid-cols-2 gap-2 text-[10px]">
-                                        <div className="text-on-surface-variant">MAINTAINABILITY</div><div className="text-primary text-right">92/100</div>
-                                        <div className="text-on-surface-variant">COMPLEXITY</div><div className="text-primary text-right">LOW</div>
-                                        <div className="text-on-surface-variant">CHURN RATE</div><div className="text-primary text-right">↑ 4%</div>
+                                        <div className="text-on-surface-variant">SECURITY</div><div className="text-primary text-right">30%</div>
+                                        <div className="text-on-surface-variant">SCALE · QUALITY · PROD</div><div className="text-primary text-right">20% each</div>
+                                        <div className="text-on-surface-variant">MAINTAINABILITY</div><div className="text-primary text-right">10%</div>
                                     </div>
                                 </div>
                             </div>
@@ -529,12 +519,12 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <h3 className="font-headline-md text-[20px] mb-4">GitHub Native</h3>
-                                    <p className="font-body-base text-body-base text-on-surface-variant">Seamless PR bot integration. It's like having your senior dev on-call 24/7 in every pull request.</p>
+                                    <p className="font-body-base text-body-base text-on-surface-variant">A GitHub webhook reviews opened or updated pull requests and posts findings as inline review comments.</p>
                                 </div>
                                 <div className="card-drawer pt-4 border-t border-outline-variant/30">
                                     <div className="text-[10px] space-y-1">
-                                        <div className="text-primary">@repolens-bot commented on PR #42:</div>
-                                        <div className="text-on-surface-variant bg-surface-container-low p-1 rounded italic">"I found 2 potential memory leaks in this commit. Reverting to previous state is recommended."</div>
+                                        <div className="text-primary">RepoLens reviewed PR #42:</div>
+                                        <div className="text-on-surface-variant bg-surface-container-low p-1 rounded italic">"Warning · Code Quality: database call made without try/catch."</div>
                                     </div>
                                 </div>
                             </div>
@@ -555,13 +545,11 @@ export default function Home() {
             <footer id="documentation" className="w-full border-t border-outline-variant bg-surface flex flex-col md:flex-row justify-between items-center py-gutter px-margin-desktop gap-4">
                 <div className="font-label-caps text-label-caps text-primary">REPOLENS</div>
                 <div className="font-code-base text-code-base text-on-surface-variant text-center md:text-left">
-                    © {new Date().getFullYear()} REPOLENS TECHNICAL SYSTEMS [ 52.3676° N, 4.9041° E ]
+                    © {new Date().getFullYear()} REPOLENS · Static analysis + LLM code health reports
                 </div>
                 <div className="flex gap-6">
-                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="#">Status: Optimal</a>
-                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="#">v4.0.2-stable</a>
-                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="#">Legal</a>
-                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="#">Access Logs</a>
+                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="https://github.com/Saanvi-Goel18/RepoLens" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <a className="font-code-base text-code-base text-on-surface-variant hover:text-primary transition-colors" href="https://github.com/Saanvi-Goel18/RepoLens#-how-it-works" target="_blank" rel="noopener noreferrer">How it works</a>
                 </div>
             </footer>
         </div>

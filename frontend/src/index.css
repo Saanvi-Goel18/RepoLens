@@ -34,14 +34,45 @@
   --red-hover: #f85149;
   --blue:   #388bfd; /* Info */
 
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* Snappier border radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* Sharper border radii — matches the landing page's crisp, terminal-inspired scale */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+}
+
+/* Light Theme — mirrors GitHub's light palette so the report page keeps its
+   identity while actually supporting the theme toggle (previously this
+   didn't exist at all, so the report page ignored the theme entirely). */
+:root[data-theme="light"] {
+  --bg-void:    #ffffff;
+  --bg-base:    #ffffff;
+  --bg-surface: #f6f8fa;
+  --bg-raised:  #eaeef2;
+  --bg-hover:   #dde3e8;
+
+  --border:       #d0d7de;
+  --border-glow:  #0969da;
+
+  --text-1: #1f2328;
+  --text-2: #59636e;
+  --text-3: #8c959f;
+
+  --a1: #0969da;
+  --a2: #0969da;
+  --a3: #218bff;
+  --grad: var(--a2);
+  --grad-h: var(--a3);
+
+  --green:  #1a7f37;
+  --green-hover: #2da44e;
+  --yellow: #9a6700;
+  --red:    #cf222e;
+  --red-hover: #a40e26;
+  --blue:   #0969da;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

@@ -1,0 +1,72 @@
+.ft-panel {
+    padding: 20px;
+}
+
+.ft-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ft-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-1);
+}
+
+.ft-sub {
+    font-size: 0.8rem;
+    color: var(--text-2);
+}
+
+.ft-tree {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    max-height: 340px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+.ft-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-2);
+    white-space: nowrap;
+}
+
+.ft-row:hover {
+    background: var(--bg-hover);
+    color: var(--text-1);
+}
+
+.ft-icon {
+    flex-shrink: 0;
+    opacity: 0.75;
+}
+
+.ft-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ft-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+
+.ft-file.ft-selected {
+    background: var(--bg-hover);
+    color: var(--text-1);
+    box-shadow: inset 2px 0 0 var(--a1);
+}

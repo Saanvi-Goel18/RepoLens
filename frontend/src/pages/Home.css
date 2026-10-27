@@ -258,9 +258,15 @@ body {
 /* Light Theme Overrides */
 body.light { background-color: #ffffff !important; color: #141313 !important; }
 body.light .bg-background { background-color: #ffffff !important; }
+body.light .bg-surface { background-color: #ffffff !important; }
+body.light .bg-surface-container { background-color: #f9fafb !important; }
+body.light .bg-outline-variant { background-color: #e5e5e5 !important; }
 body.light .text-primary { color: #141313 !important; }
+body.light .text-primary\/60 { color: rgba(20, 19, 19, 0.6) !important; }
 body.light .text-on-surface-variant { color: #4b5563 !important; }
+body.light .text-on-surface-variant\/40 { color: rgba(75, 85, 99, 0.4) !important; }
 body.light .border-outline-variant { border-color: #e5e5e5 !important; }
+body.light .border-outline-variant\/30 { border-color: rgba(0, 0, 0, 0.08) !important; }
 body.light .border-primary { border-color: #141313 !important; }
 body.light .bg-primary { background-color: #141313 !important; }
 body.light .text-background { color: #ffffff !important; }
@@ -284,3 +290,10 @@ body.light .text-secondary-fixed { color: #2563eb !important; }
 body.light .bg-transparent.text-primary { color: #141313 !important; }
 body.light .border-current { border-color: #141313 !important; }
 body.light button.bg-transparent:hover { border-color: #141313 !important; color: #141313 !important; }
+
+/* hover / focus / group-hover variants — Tailwind emits these as separate
+   classes, so the base-class overrides above don't apply to them */
+body.light .hover\:text-primary:hover { color: #141313 !important; }
+body.light .hover\:border-primary:hover { border-color: #141313 !important; }
+body.light .focus\:border-primary:focus { border-color: #141313 !important; }
+body.light .group:hover .group-hover\:border-primary { border-color: #141313 !important; }

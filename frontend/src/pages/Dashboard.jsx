@@ -4,12 +4,39 @@ import { ShieldAlert, AlertTriangle, Info, ChevronDown, Activity, ArrowLeft, Cop
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import HistoryChart from '../components/HistoryChart';
+import FileTree from '../components/FileTree';
+import { useTheme } from '../ThemeContext';
 import './Dashboard.css';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const ALL_CATEGORIES = ['Security', 'Scalability', 'Code Quality', 'Production Readiness', 'Maintainability'];
 const ALL_SEVERITIES = ['Critical', 'Warning', 'Info'];
+
+function ReportNav() {
+    const { theme, toggleTheme } = useTheme();
+    return (
+        <nav className="w-full z-[100] backdrop-blur-md border-b border-outline-variant flex justify-between items-center h-14 px-margin-desktop sticky top-0 bg-background/80 text-primary">
+            <Link to="/" className="font-headline-md text-headline-md tracking-tighter text-primary no-underline">
+                RepoLens
+            </Link>
+            <div className="flex items-center gap-6">
+                <button
+                    onClick={toggleTheme}
+                    className="text-primary hover:opacity-80 transition-colors flex items-center justify-center"
+                    aria-label="Toggle theme"
+                >
+                    <span className="material-symbols-outlined text-[20px]">
+                        {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+                    </span>
+                </button>
+                <Link to="/" className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2 no-underline">
+                    <ArrowLeft size={14} /> New Scan
+                </Link>
+            </div>
+        </nav>
+    );
+}
 
 export default function Dashboard() {
     const { jobId } = useParams();
@@ -21,6 +48,7 @@ export default function Dashboard() {
     // ── Filter state ────────────────────────────────────────────────────────
     const [activeSeverities, setActiveSeverities] = useState(new Set());
     const [activeCategories, setActiveCategories] = useState(new Set());
+    const [selectedFile, setSelectedFile] = useState(null);
 
     useEffect(() => {
         let intervalId;
@@ -144,6 +172,12 @@ export default function Dashboard() {
     const clearFilters = () => {
         setActiveSeverities(new Set());
         setActiveCategories(new Set());
+        setSelectedFile(null);
+    };
+
+    const handleSelectFile = (path) => {
+        setSelectedFile(path);
+        setExpandedIssues(new Set());
     };
 
     // ── useMemo MUST be here before early returns (Rules of Hooks) ────
@@ -151,25 +185,29 @@ export default function Dashboard() {
     const filteredIssues = useMemo(() => {
         return issues.filter(issue => {
             const matchesSeverity = activeSeverities.size === 0 || activeSeverities.has(issue.severity);
-            const matchesCategory = activeCategories.size === 0 || ALL_CATEGORIES.some(cat => 
-                issue.category.toLowerCase() === cat.toLowerCase() && activeCategories.has(cat)
+            const matchesCategory = activeCategories.size === 0 || ALL_CATEGORIES.some(cat =>
+                (issue.category || '').toLowerCase() === cat.toLowerCase() && activeCategories.has(cat)
             );
-            return matchesSeverity && matchesCategory;
+            const matchesFile = !selectedFile || issue.file === selectedFile;
+            return matchesSeverity && matchesCategory && matchesFile;
         });
-    }, [issues, activeSeverities, activeCategories]);
-    const isFiltered = activeSeverities.size > 0 || activeCategories.size > 0;
+    }, [issues, activeSeverities, activeCategories, selectedFile]);
+    const isFiltered = activeSeverities.size > 0 || activeCategories.size > 0 || !!selectedFile;
 
     // ── Loading / Error states ──────────────────────────────────────────────
     if (error) {
         return (
-            <div className="dashboard-container centered animate-fade-in">
-                <div className="state-card glass-panel">
-                    <ShieldAlert size={40} className="state-icon text-danger" />
-                    <h2>Failed to load report</h2>
-                    <p>{error}</p>
-                    <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Back to Home</Link>
+            <>
+                <ReportNav />
+                <div className="dashboard-container centered animate-fade-in">
+                    <div className="state-card glass-panel">
+                        <ShieldAlert size={40} className="state-icon text-danger" />
+                        <h2>Failed to load report</h2>
+                        <p>{error}</p>
+                        <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Back to Home</Link>
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
@@ -182,6 +220,8 @@ export default function Dashboard() {
         const statusText = statusMessages[job?.status] || 'Preparing…';
 
         return (
+            <>
+            <ReportNav />
             <div className="skeleton-layout animate-fade-in">
 
                 {/* Status label */}
@@ -246,20 +286,24 @@ export default function Dashboard() {
                 </div>
 
             </div>
+            </>
         );
     }
 
 
     if (job.status === 'error') {
         return (
-            <div className="dashboard-container centered animate-fade-in">
-                <div className="state-card glass-panel">
-                    <AlertTriangle size={40} className="state-icon text-warn" />
-                    <h2>Analysis failed</h2>
-                    <p>{job.error}</p>
-                    <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Try another repo</Link>
+            <>
+                <ReportNav />
+                <div className="dashboard-container centered animate-fade-in">
+                    <div className="state-card glass-panel">
+                        <AlertTriangle size={40} className="state-icon text-warn" />
+                        <h2>Analysis failed</h2>
+                        <p>{job.error}</p>
+                        <Link to="/" className="btn-primary"><ArrowLeft size={16}/> Try another repo</Link>
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
@@ -286,6 +330,8 @@ export default function Dashboard() {
     };
 
     return (
+        <>
+        <ReportNav />
         <div className="dashboard-container animate-fade-in">
 
             {/* ── Header ── */}
@@ -367,27 +413,40 @@ export default function Dashboard() {
                     <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Activity size={18} /> Analysis Transparency
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '0.9rem', color: 'var(--text-3)' }}>
                         <div>
-                            <strong style={{ color: 'var(--text-main)' }}>Universal Checks ({job.stats.universalChecksRun.length}/{job.stats.universalChecksRun.length} ran)</strong>
+                            <strong style={{ color: 'var(--text-1)' }}>Universal Checks ({job.stats.universalChecksRun.length}/{job.stats.universalChecksRun.length} ran)</strong>
                             <p style={{ margin: '4px 0 0 0' }}>{job.stats.universalChecksRun.join(', ')}</p>
                         </div>
                         <div>
-                            <strong style={{ color: 'var(--text-main)' }}>Language-Specific Checks</strong>
+                            <strong style={{ color: 'var(--text-1)' }}>Language-Specific Checks</strong>
                             <p style={{ margin: '4px 0 0 0' }}>
                                 {job.stats.languageSpecificChecksRun?.length > 0 && 
-                                    <span style={{ color: 'var(--accent-color)' }}>
+                                    <span style={{ color: 'var(--a1)' }}>
                                         Ran: {job.stats.languageSpecificChecksRun.join(', ')}<br/>
                                     </span>
                                 }
                                 {job.stats.languageSpecificChecksSkipped?.length > 0 && 
-                                    <span style={{ color: 'var(--text-dim)' }}>
+                                    <span style={{ color: 'var(--text-3)' }}>
                                         Skipped: {job.stats.languageSpecificChecksSkipped.map(s => `${s.name} (${s.reason})`).join(', ')}
                                     </span>
                                 }
                             </p>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* ── Repository Structure ── */}
+            {job.stats?.fileTree?.length > 0 && (
+                <div className="animate-scale-in" style={{ animationDelay: '0.07s', marginTop: '16px' }}>
+                    <FileTree
+                        fileTree={job.stats.fileTree}
+                        issues={issues}
+                        truncated={job.stats.fileTreeTruncated}
+                        selectedFile={selectedFile}
+                        onSelectFile={handleSelectFile}
+                    />
                 </div>
             )}
 
@@ -425,6 +484,15 @@ export default function Dashboard() {
                         </button>
                     ))}
                 </div>
+
+                {selectedFile && (
+                    <>
+                        <div className="filter-divider" />
+                        <button className="filter-pill active" onClick={() => setSelectedFile(null)}>
+                            File: {selectedFile.split('/').pop()} ✕
+                        </button>
+                    </>
+                )}
 
                 {isFiltered && (
                     <button className="filter-clear" onClick={clearFilters}>
@@ -490,5 +558,6 @@ export default function Dashboard() {
                 )}
             </div>
         </div>
+        </>
     );
 }

@@ -4,13 +4,13 @@
 
 <h1>🔍 RepoLens</h1>
 
-<p><strong>An AI-powered code health analyzer that reviews any public GitHub repository in seconds.</strong><br/>
+<p><strong>An AI-powered code health analyzer that reviews any GitHub repository (public, or private after GitHub sign-in).</strong><br/>
 Combines deterministic static analysis with contextual LLM review to produce a structured, weighted health report.</p>
 
 <p>
   <img src="https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white" />
   <img src="https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react&logoColor=black" />
-  <img src="https://img.shields.io/badge/Groq-Llama_3.3_70B-f55036?style=flat-square" />
+  <img src="https://img.shields.io/badge/Groq-GPT_OSS_120B-f55036?style=flat-square" />
   <img src="https://img.shields.io/badge/GitHub-Octokit-181717?style=flat-square&logo=github&logoColor=white" />
   <img src="https://img.shields.io/badge/OSV-Vulnerability%20DB-red?style=flat-square" />
   <img src="https://github.com/Saanvi-Goel18/RepoLens/actions/workflows/ci.yml/badge.svg" alt="CI" />
@@ -31,7 +31,7 @@ Combines deterministic static analysis with contextual LLM review to produce a s
 
 Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no rate limiting, vulnerable dependencies, and broken async patterns. Existing tools like CodeRabbit live inside pull requests and require team setup. ChatGPT gives generic advice without a repeatable rubric.
 
-**RepoLens gives you a structured, scored health report for any GitHub repository in under 30 seconds — no login, no CI/CD, no installation.**
+**RepoLens gives you a structured, scored health report for any GitHub repository in a few minutes — no login needed for public repos, no CI/CD, no installation.**
 
 ---
 
@@ -41,7 +41,10 @@ Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no
 - **GitHub OAuth Integration** — Securely authenticate to scan private repositories with ease.
 - **Premium Deep Dark Aesthetic** — Vercel-inspired UI with sophisticated `Playfair Display` serif typography, smooth ScrollSpy navigation, and unified dark `#0a0a0a` surfaces.
 - **Background Processing** — Submits analysis as a background task (`202 Accepted`), polls for results.
-- **Hybrid Analysis Engine** — 4 static detectors + 1 LLM layer running concurrently.
+- **Hybrid Analysis Engine** — 10 static checks (gated by detected language) + a chunked LLM review.
+- **Repository Explorer** — File tree with worst-severity markers per file/folder; click a file to filter issues.
+- **PR Review Bot** — GitHub webhook runs the same pipeline on PR diffs and posts inline review comments.
+- **History & PDF** — Score trend across rescans (PostgreSQL) and a downloadable PDF report.
 - **Weighted Score System** — Overall health score (0-100) computed across 5 rubric categories.
 - **Expandable Issue Reports** — Every issue comes with a file path, line number, severity, and a concrete fix suggestion.
 
@@ -61,20 +64,19 @@ GitHub URL
     ▼
 [2] Intelligent File Prioritizer (tiktoken)
     │  Scores files by type (auth > models > routes > config).
-    │  Fetches content in priority order, enforcing an 80,000-token budget.
+    │  Fetches content in priority order, enforcing a 40,000-token budget.
     │
     ▼
 [3] Static Analysis Layer  (runs in parallel via Promise.all)
-    │  ├─ ESLint Linter       — Programmatic AST-based code quality checks
-    │  ├─ Secrets Detector    — Regex scan for API keys, JWTs, hardcoded credentials
-    │  ├─ Vibe-code Detector  — Flags missing rate limits, poor async patterns, mixed module systems
-    │  └─ OSV Dependency Audit — Batch queries the OSV vulnerability DB for all npm dependencies
+    │  Universal: Secrets, Function Size, CI/CD, OSV Dependency Audit (npm/PyPI/Go)
+    │  JS/TS-only (skipped if not detected): ESLint, SQL Injection, Blocking I/O,
+    │    Debug Statements, Missing Error Handler; Vibe Checks (JS/TS/Python/Go)
     │
     ▼
-[4] LLM Analysis (Groq Llama 3.3 70B + Structured JSON Schema)
-    │  Receives file contents + static issues as context.
-    │  Returns category scores and additional architectural issues
-    │  via strict JSON schema enforcement (no hallucinated formats).
+[4] LLM Analysis (Groq GPT-OSS 120B, JSON mode)
+    │  Files are split into ~4,500-token chunks (free-tier TPM limit).
+    │  Each chunk also sees the repo file list + a summary of static issues.
+    │  Per-category chunk scores are merged with min() (weakest link).
     │
     ▼
 [5] Score Merger
@@ -82,6 +84,7 @@ GitHub URL
     │  Applies deterministic penalties for static issues:
     │    Critical security issue  → -30 from security score
     │    Critical other issue     → -20 from category score
+    │    Each further issue in a category counts 0.75x the previous (diminishing)
     │  Computes final weighted overall score:
     │    Security (30%) + Scalability (20%) + Quality (20%) + Production (20%) + Maintainability (10%)
     │
@@ -98,7 +101,7 @@ GitHub URL
 | Backend Runtime | Node.js + Express | Non-blocking I/O for concurrent API calls |
 | GitHub Integration | Octokit (REST) | Official GitHub SDK, handles auth & rate limits |
 | Token Management | tiktoken | Exact token counting (not estimation) for LLM context budget |
-| LLM | Groq (llama-3.3-70b-versatile) | Free API, OpenAI-compatible, fast inference; `json_object` response format ensures structured output |
+| LLM | Groq (openai/gpt-oss-120b) | Free API, OpenAI-compatible, 131K context, reasoning-capable; `json_object` response format ensures structured output |
 | Vulnerability Data | OSV API (batch) | Free, open, authoritative vulnerability database — no API key needed |
 | Frontend | React + Vite | Fast HMR during development, optimized production builds |
 | Routing | React Router v6 | Client-side routing for `/` and `/r/:jobId` report pages |
