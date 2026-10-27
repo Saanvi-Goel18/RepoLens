@@ -29,7 +29,7 @@ export default function HistoryChart({ owner, repo }) {
 
     return (
         <div className="glass-panel" style={{ padding: '24px', marginTop: '16px' }}>
-            <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '20px', color: 'var(--text-1)' }}>
                 Historical Trend
             </h3>
             <div style={{ width: '100%', height: 200 }}>
@@ -51,7 +51,7 @@ export default function HistoryChart({ owner, repo }) {
                             axisLine={false}
                         />
                         <Tooltip 
-                            contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', borderRadius: '8px', color: 'var(--text-1)' }}
+                            contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', borderRadius: '2px', color: 'var(--text-1)', fontFamily: 'var(--mono)', fontSize: '12px' }}
                             labelStyle={{ color: 'var(--text-2)', marginBottom: '4px' }}
                             formatter={(value) => [`${value}/100`, 'Overall Score']}
                             labelFormatter={(label, payload) => payload?.[0]?.payload?.time ? `${label} ${payload[0].payload.time}` : label}
@@ -60,7 +60,7 @@ export default function HistoryChart({ owner, repo }) {
                             type="monotone" 
                             dataKey="overall_score" 
                             stroke="var(--a1)" 
-                            strokeWidth={3}
+                            strokeWidth={2}
                             dot={{ fill: 'var(--a1)', strokeWidth: 2, r: 4 }}
                             activeDot={{ r: 6 }}
                         />

@@ -16,6 +16,8 @@ Combines deterministic static analysis with contextual LLM review to produce a s
   <img src="https://github.com/Saanvi-Goel18/RepoLens/actions/workflows/ci.yml/badge.svg" alt="CI" />
 </p>
 
+<p><strong>🌐 Live: <a href="https://repo-lens-flame.vercel.app">repo-lens-flame.vercel.app</a></strong></p>
+
 <p>
   <a href="#-how-it-works">How It Works</a> ·
   <a href="#-getting-started">Getting Started</a> ·
@@ -39,8 +41,8 @@ Vibe-coded apps work — until they don't. They ship with hardcoded API keys, no
 
 - **Zero Setup** — Paste a GitHub URL. That's it.
 - **GitHub OAuth Integration** — Securely authenticate to scan private repositories with ease.
-- **Premium Deep Dark Aesthetic** — Vercel-inspired UI with sophisticated `Playfair Display` serif typography, smooth ScrollSpy navigation, and unified dark `#0a0a0a` surfaces.
-- **Background Processing** — Submits analysis as a background task (`202 Accepted`), polls for results.
+- **Monochrome UI with Light/Dark Themes** — `Playfair Display` headlines, `JetBrains Mono` labels, consistent across the landing and report pages.
+- **Background Processing** — Submits analysis as a background task (`202 Accepted`), polls for results; reports persist in PostgreSQL and survive restarts.
 - **Hybrid Analysis Engine** — 10 static checks (gated by detected language) + a chunked LLM review.
 - **Repository Explorer** — File tree with worst-severity markers per file/folder; click a file to filter issues.
 - **PR Review Bot** — GitHub webhook runs the same pipeline on PR diffs and posts inline review comments.
@@ -105,7 +107,11 @@ GitHub URL
 | Vulnerability Data | OSV API (batch) | Free, open, authoritative vulnerability database — no API key needed |
 | Frontend | React + Vite | Fast HMR during development, optimized production builds |
 | Routing | React Router v6 | Client-side routing for `/` and `/r/:jobId` report pages |
-| Icons | Lucide React | Consistent, lightweight icon system |
+| Icons | Lucide React + Material Symbols | Consistent, lightweight icon system |
+| Database | PostgreSQL (pg) | Persists jobs and scan history (trend chart, shareable reports) |
+| Auth | GitHub OAuth + JWT (HttpOnly cookie) | Private-repo scanning without storing the user's token |
+| PR Bot | @octokit/webhooks | HMAC-verified webhook; posts inline PR review comments |
+| PDF | jsPDF + autoTable | Client-side report export |
 
 ---
 
@@ -113,23 +119,32 @@ GitHub URL
 
 ```
 repolens/
+├── .github/workflows/ci.yml   # Runs backend tests on every push / PR
 ├── backend/
-│   ├── index.js              # Express server, job queue, analysis pipeline orchestrator
-│   ├── githubService.js      # Octokit wrapper: fetchRepoTree, fetchFileContent
-│   ├── prioritizer.js        # File scoring + token-budget-aware content fetcher
-│   ├── linter.js             # Programmatic ESLint runner
-│   ├── scorer.js             # Score merger: static penalties + weighted overall score
-│   ├── llmService.js         # OpenAI integration with strict JSON schema prompting
-│   ├── audit.js              # OSV vulnerability DB batch query
-│   └── detectors/
-│       ├── secrets.js        # Hardcoded credentials regex detector
-│       └── vibe.js           # Missing rate limits, bad async, mixed module systems
+│   ├── index.js               # Express server, routes, auth, job lifecycle, runPipeline
+│   ├── analysisPipeline.js    # Shared static + chunked-LLM pipeline (scan + PR webhook)
+│   ├── githubService.js       # Octokit wrapper: repo tree, file content, access check
+│   ├── prioritizer.js         # File weighting + tiktoken budget-aware fetcher
+│   ├── llmService.js          # Groq call, prompt, retry/back-off, response normalisation
+│   ├── scorer.js              # Dedupe, static penalties with decay, weighted score
+│   ├── linter.js              # Programmatic ESLint (JS/TS)
+│   ├── audit.js               # OSV batch vulnerability lookup (npm, PyPI, Go)
+│   ├── db.js                  # PostgreSQL schema + queries (scans, jobs)
+│   ├── webhookHandler.js      # GitHub PR review bot
+│   ├── detectors/             # secrets, vibe, sqlInjection, blockingIO, debugStatements,
+│   │                          # missingErrorHandler, oversizedFunctions, cicd
+│   └── tests/                 # Plain-Node unit tests (npm test)
 └── frontend/
     └── src/
-        ├── App.jsx           # Router setup
-        └── pages/
-            ├── Home.jsx      # URL input, hero section
-            └── Dashboard.jsx # Score cards, issue list, polling
+        ├── App.jsx            # Router: / and /r/:jobId
+        ├── ThemeContext.jsx   # Light/dark theme
+        ├── pages/
+        │   ├── Home.jsx       # Landing page, scan modal, GitHub sign-in
+        │   └── Dashboard.jsx  # Report: scores, transparency, file tree, filters, issues, PDF
+        └── components/
+            ├── FileTree.jsx       # Repo explorer with per-file severity
+            ├── HistoryChart.jsx   # Score trend across rescans
+            └── ErrorBoundary.jsx
 ```
 
 ---
@@ -161,8 +176,13 @@ cp .env.example .env
 ```env
 GITHUB_TOKEN=ghp_your_token_here
 GROQ_API_KEY=gsk_your_groq_key_here
+DATABASE_URL=postgresql://user:password@host:5432/db
+JWT_SECRET=a_long_random_string
+FRONTEND_URL=http://localhost:5173
 PORT=3001
 ```
+
+See `backend/.env.example` for every variable (OAuth and webhook secrets are optional).
 
 Start the backend:
 ```bash
@@ -216,7 +236,16 @@ Navigate to **http://localhost:5173**, paste any public GitHub repo URL, and cli
 |---|---|---|
 | `GET` | `/health` | Server health check |
 | `POST` | `/analyze` | Submit a repo URL for analysis. Returns `{ jobId }` immediately (`202 Accepted`). |
-| `GET` | `/result/:jobId` | Poll for job status. Returns `queued`, `fetching`, `analyzing`, `done`, or `error`. |
+| `GET` | `/result/:jobId` | Poll for job status. Returns `queued`, `fetching`, `analyzing`, `done`, or `error`. Falls back to the DB after a restart. |
+| `GET` | `/trends/:owner/:repo` | Score history for a repository |
+| `GET` | `/recent-scans` | Last 10 scans, anonymised (hashed repo id + score) |
+| `GET` | `/auth/github` | Start GitHub OAuth (private repos) |
+| `GET` | `/auth/github/callback` | OAuth callback; sets an HttpOnly JWT cookie |
+| `GET` | `/auth/status` | `{ isAuthenticated }` |
+| `POST` | `/auth/logout` | Clears the auth cookie |
+| `POST` | `/webhook/github` | GitHub PR webhook (`pull_request.opened` / `synchronize`) |
+
+`POST /analyze` is rate-limited to 5 requests per IP per 15 minutes.
 
 **Example:**
 ```bash
@@ -237,15 +266,15 @@ curl http://localhost:3001/result/abc-123
 
 The final score is a weighted average of 5 categories:
 
-| Category | Weight | What's Evaluated |
-|---|---|---|
-| 🔐 Security | 30% | Hardcoded secrets, missing auth middleware, CORS config, vulnerable deps |
-| ⚡ Scalability | 20% | N+1 queries, synchronous blocking ops, pagination, caching |
-| ✨ Code Quality | 20% | ESLint issues, module consistency, error handling, complexity |
-| 🚢 Production Readiness | 20% | Env var usage, structured logging, health checks, Docker/PM2 config |
-| 🧹 Maintainability | 10% | Folder structure, README quality, test coverage |
+| Category | Weight | Static checks that feed it | LLM review looks at |
+|---|---|---|---|
+| 🔐 Security | 30% | Hardcoded secrets, committed `.env`, SQL injection patterns, OSV vulnerable deps, auth without rate limiting, Python `eval/exec` | Auth/authorization gaps, unsafe data flows |
+| ⚡ Scalability | 20% | Blocking sync I/O in route files, Go `panic` | Inefficient queries, missing pagination/caching |
+| ✨ Code Quality | 20% | ESLint, DB calls without try/catch, mixed module systems, debug statements | Logic flaws, duplication, missing abstractions |
+| 🚢 Production Readiness | 20% | Missing Express error handler, missing `.env.example`, no CI/CD | Config, logging, deploy readiness |
+| 🧹 Maintainability | 10% | Functions over 80 lines | Structure, readability |
 
-**Static issues override LLM scores:** A hardcoded API key detected by the secrets scanner immediately applies a -30 penalty to the security score, regardless of what the LLM says.
+**How the score is computed:** the LLM provides a baseline score per category (chunk scores merged with `min()`, weakest link). Static findings then subtract deterministic penalties: Critical −30 in Security / −20 elsewhere, Warning −10 / −5, Info −2 / −1. Each additional issue in the same category counts 0.75× the previous one, so many small issues don't outweigh one critical one. The LLM is told not to score static findings, so nothing is counted twice.
 
 ---
 

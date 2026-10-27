@@ -5,74 +5,78 @@
 @tailwind utilities;
 
 :root {
-  /* GitHub Dark Palette */
-  --bg-void:    #0d1117; /* Main background */
-  --bg-base:    #0d1117;
-  --bg-surface: #161b22; /* Card/Panel background */
-  --bg-raised:  #21262d; /* Button background */
-  --bg-hover:   #30363d;
+  /* Monochrome palette — mirrors the landing page (tailwind.config.js tokens)
+     so the report page reads as the same product. */
+  --bg-void:    #000000; /* page background (tailwind: background) */
+  --bg-base:    #000000;
+  --bg-surface: #0a0a0a; /* panels (tailwind: surface) */
+  --bg-raised:  #1a1a1a; /* tracks, skeletons (surface-container-high) */
+  --bg-hover:   #111111;
 
-  --border:       #30363d;
-  --border-glow:  #58a6ff;
+  --border:       #222222; /* outline-variant */
+  --border-glow:  #ffffff;
 
-  --text-1: #c9d1d9; /* Main text */
-  --text-2: #8b949e; /* Muted text */
-  --text-3: #484f58; /* Very muted */
+  --text-1: #ffffff; /* primary */
+  --text-2: #a3a3a3; /* on-surface-variant */
+  --text-3: #666666;
 
-  /* Accents */
-  --a1: #2f81f7; /* GitHub Primary Blue */
-  --a2: #58a6ff;
-  --a3: #79c0ff;
-  --grad: var(--a2); /* Flat color instead of gradient for a cleaner look */
-  --grad-h: var(--a3);
-
-  /* Status Colors (GitHub style) */
-  --green:  #238636; /* Passing / Excellent */
-  --green-hover: #2ea043;
-  --yellow: #d29922; /* Warning */
-  --red:    #da3633; /* Critical / Error */
-  --red-hover: #f85149;
-  --blue:   #388bfd; /* Info */
-
-  --font: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-
-  /* Sharper border radii — matches the landing page's crisp, terminal-inspired scale */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 10px;
-}
-
-/* Light Theme — mirrors GitHub's light palette so the report page keeps its
-   identity while actually supporting the theme toggle (previously this
-   didn't exist at all, so the report page ignored the theme entirely). */
-:root[data-theme="light"] {
-  --bg-void:    #ffffff;
-  --bg-base:    #ffffff;
-  --bg-surface: #f6f8fa;
-  --bg-raised:  #eaeef2;
-  --bg-hover:   #dde3e8;
-
-  --border:       #d0d7de;
-  --border-glow:  #0969da;
-
-  --text-1: #1f2328;
-  --text-2: #59636e;
-  --text-3: #8c959f;
-
-  --a1: #0969da;
-  --a2: #0969da;
-  --a3: #218bff;
+  /* Accent is the landing page's white "primary" */
+  --a1: #ffffff;
+  --a1-rgb: 255, 255, 255;
+  --a2: #ffffff;
+  --a3: #e2e2e2;
+  --on-a1: #000000; /* text on an --a1 fill */
   --grad: var(--a2);
   --grad-h: var(--a3);
 
-  --green:  #1a7f37;
-  --green-hover: #2da44e;
-  --yellow: #9a6700;
-  --red:    #cf222e;
-  --red-hover: #a40e26;
-  --blue:   #0969da;
+  /* Status colours — same hues the landing page's scanner log uses */
+  --green:  #4ade80;
+  --green-hover: #86efac;
+  --yellow: #eab308;
+  --red:    #f87171;
+  --red-hover: #fca5a5;
+  --blue:   #60a5fa;
+
+  --font: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --serif: 'Playfair Display', Georgia, serif;
+
+  /* Same crisp radius scale as the landing page (tailwind borderRadius) */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 8px;
+}
+
+/* Light theme — matches the landing page's body.light overrides in Home.css */
+:root[data-theme="light"] {
+  --bg-void:    #ffffff;
+  --bg-base:    #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-raised:  #e5e5e5;
+  --bg-hover:   #f1f5f9;
+
+  --border:       #e5e5e5;
+  --border-glow:  #141313;
+
+  --text-1: #141313;
+  --text-2: #4b5563;
+  --text-3: #9ca3af;
+
+  --a1: #141313;
+  --a1-rgb: 20, 19, 19;
+  --a2: #141313;
+  --a3: #374151;
+  --on-a1: #ffffff;
+  --grad: var(--a2);
+  --grad-h: var(--a3);
+
+  --green:  #16a34a;
+  --green-hover: #15803d;
+  --yellow: #ca8a04;
+  --red:    #dc2626;
+  --red-hover: #b91c1c;
+  --blue:   #2563eb;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

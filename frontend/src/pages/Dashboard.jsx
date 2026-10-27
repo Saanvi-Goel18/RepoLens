@@ -237,8 +237,8 @@ export default function Dashboard() {
                         <div className="skeleton" style={{ width: 200, height: 14 }} />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <div className="skeleton" style={{ width: 110, height: 34, borderRadius: 8 }} />
-                        <div className="skeleton" style={{ width: 100, height: 34, borderRadius: 8 }} />
+                        <div className="skeleton" style={{ width: 110, height: 34, borderRadius: 2 }} />
+                        <div className="skeleton" style={{ width: 100, height: 34, borderRadius: 2 }} />
                     </div>
                 </div>
 
@@ -256,7 +256,7 @@ export default function Dashboard() {
                                     <div className="skeleton" style={{ width: w, height: 13 }} />
                                     <div className="skeleton" style={{ width: 36, height: 13 }} />
                                 </div>
-                                <div className="skeleton" style={{ width: '100%', height: 8, borderRadius: 4 }} />
+                                <div className="skeleton" style={{ width: '100%', height: 4, borderRadius: 0 }} />
                             </div>
                         ))}
                     </div>
@@ -266,7 +266,7 @@ export default function Dashboard() {
                 <div className="skeleton-filters">
                     <div className="skeleton" style={{ width: 60, height: 13 }} />
                     {[70, 80, 56, 90, 72, 110, 88].map((w, i) => (
-                        <div className="skeleton" key={i} style={{ width: w, height: 32, borderRadius: 20 }} />
+                        <div className="skeleton" key={i} style={{ width: w, height: 32, borderRadius: 2 }} />
                     ))}
                 </div>
 
@@ -276,8 +276,8 @@ export default function Dashboard() {
                         <div className="skeleton-issue" key={i}>
                             <div className="skeleton-issue-row">
                                 <div className="skeleton" style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0 }} />
-                                <div className="skeleton" style={{ width: 60, height: 20, borderRadius: 20 }} />
-                                <div className="skeleton" style={{ width: 90, height: 20, borderRadius: 20 }} />
+                                <div className="skeleton" style={{ width: 60, height: 20, borderRadius: 2 }} />
+                                <div className="skeleton" style={{ width: 90, height: 20, borderRadius: 2 }} />
                                 <div className="skeleton" style={{ width: 140, height: 13, marginLeft: 4 }} />
                             </div>
                             <div className="skeleton" style={{ width: `${70 + i * 5}%`, height: 14 }} />
@@ -313,11 +313,11 @@ export default function Dashboard() {
     const getScoreLabel = (s) => s >= 85 ? 'Excellent' : s >= 75 ? 'Good' : s >= 50 ? 'Needs Attention' : 'Critical Issues';
 
     const categoryMeta = {
-        security:        { label: 'Security',        emoji: '🔐' },
-        scalability:     { label: 'Scalability',     emoji: '⚡' },
-        quality:         { label: 'Code Quality',    emoji: '✨' },
-        production:      { label: 'Production',      emoji: '🚢' },
-        maintainability: { label: 'Maintainability', emoji: '🧹' },
+        security:        { label: 'Security',        icon: 'shield' },
+        scalability:     { label: 'Scalability',     icon: 'bolt' },
+        quality:         { label: 'Code Quality',    icon: 'code' },
+        production:      { label: 'Production',      icon: 'rocket_launch' },
+        maintainability: { label: 'Maintainability', icon: 'build' },
     };
 
     const severityCounts = { Critical: 0, Warning: 0, Info: 0 };
@@ -337,6 +337,7 @@ export default function Dashboard() {
             {/* ── Header ── */}
             <div className="dashboard-header animate-scale-in">
                 <div>
+                    <span className="eyebrow">Audit Report</span>
                     <div className="repo-breadcrumb">
                         <a href={job.repoUrl} target="_blank" rel="noopener noreferrer" className="repo-link">
                             {job.repoUrl.replace('https://github.com/', '')}
@@ -389,7 +390,8 @@ export default function Dashboard() {
                         <div className="cat-item" key={key}>
                             <div className="cat-header">
                                 <span className="cat-name">
-                                    {categoryMeta[key]?.emoji} {categoryMeta[key]?.label || key}
+                                    <span className="material-symbols-outlined cat-icon">{categoryMeta[key]?.icon || 'analytics'}</span>
+                                    {categoryMeta[key]?.label || key}
                                 </span>
                                 <span className="cat-score">{score}/100</span>
                             </div>
@@ -410,7 +412,7 @@ export default function Dashboard() {
             {/* ── Analysis Transparency ── */}
             {job.stats && job.stats.universalChecksRun && (
                 <div className="glass-panel transparency-panel animate-scale-in" style={{ animationDelay: '0.06s', marginTop: '16px' }}>
-                    <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Activity size={18} /> Analysis Transparency
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '0.9rem', color: 'var(--text-3)' }}>
@@ -422,7 +424,7 @@ export default function Dashboard() {
                             <strong style={{ color: 'var(--text-1)' }}>Language-Specific Checks</strong>
                             <p style={{ margin: '4px 0 0 0' }}>
                                 {job.stats.languageSpecificChecksRun?.length > 0 && 
-                                    <span style={{ color: 'var(--a1)' }}>
+                                    <span style={{ color: 'var(--text-2)' }}>
                                         Ran: {job.stats.languageSpecificChecksRun.join(', ')}<br/>
                                     </span>
                                 }

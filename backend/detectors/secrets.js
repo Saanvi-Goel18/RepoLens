@@ -6,11 +6,11 @@ function detectSecrets(files) {
     
     const secretRegexes = [
         // AWS Access Key ID
-        { regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, type: "AWS Access Key" },
+        { regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, type: "AWS access key" },
         // Generic API Key assignments (e.g., const apiKey = "sk-...")
-        { regex: /(?:api_key|apikey|secret|token|password)[\s]*[:=][\s]*["']([^"']+)["']/gi, type: "Hardcoded Secret/Password" },
+        { regex: /(?:api_key|apikey|secret|token|password)[\s]*[:=][\s]*["']([^"']+)["']/gi, type: "secret/password" },
         // Bearer token (JWTs)
-        { regex: /Bearer\s+(ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)/g, type: "Hardcoded JWT Token" }
+        { regex: /Bearer\s+(ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)/g, type: "JWT token" }
     ];
 
     let hasEnvExample = false;
