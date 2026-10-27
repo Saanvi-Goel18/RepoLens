@@ -54,13 +54,15 @@ async function fetchRepoTree(owner, repo, userToken = null) {
 /**
  * Fetches the content of a specific file
  */
-async function fetchFileContent(owner, repo, path, userToken = null) {
+async function fetchFileContent(owner, repo, path, userToken = null, ref = undefined) {
     try {
         const client = getOctokit(userToken);
+        // ref (branch/SHA) is optional — omitted, GitHub serves the default branch.
         const { data } = await client.rest.repos.getContent({
             owner,
             repo,
             path,
+            ...(ref ? { ref } : {}),
         });
         
         if (data.type === 'file') {

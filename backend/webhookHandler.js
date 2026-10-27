@@ -47,7 +47,9 @@ async function handlePullRequest({ id, name, payload }) {
         // 2. Fetch content for changed files
         const selectedFiles = [];
         for (const file of changedFiles) {
-            const content = await fetchFileContent(owner, repo, file.filename, process.env.GITHUB_TOKEN);
+            // Read the PR head's version of the file, not the default branch's —
+            // otherwise added files 404 and modified files are reviewed pre-change.
+            const content = await fetchFileContent(owner, repo, file.filename, process.env.GITHUB_TOKEN, pr.head.sha);
             if (content) {
                 selectedFiles.push({
                     path: file.filename,
